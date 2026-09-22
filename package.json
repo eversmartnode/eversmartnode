@@ -3,7 +3,7 @@
   "version": "1.7.0-alpha.54-target-plus-one-handover",
   "private": true,
   "description": "EverSmartNode bootstrap + EverPocket autonomous cluster integration (temporary Bootstrap A + full managed fleet handover)",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "dependencies": {
     "evernode-js-client": "0.6.61",
     "everpocket-nodejs-contract": "0.1.6",

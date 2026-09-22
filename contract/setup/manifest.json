@@ -1,0 +1,18 @@
+{
+  "name": "EverAdmin EV Signer Setup",
+  "short_name": "Signer Setup",
+  "description": "EverAdmin-specific EV Signer credential generator for HotPocket admin keys and OTP",
+  "start_url": "/setup/",
+  "scope": "/setup/",
+  "display": "standalone",
+  "background_color": "#07101e",
+  "theme_color": "#07101e",
+  "icons": [
+    {
+      "src": "/setup/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

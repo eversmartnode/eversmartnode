@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EverAdmin · EV Signer Setup</title>
+  <meta name="theme-color" content="#07101e">
+  <link rel="manifest" href="./manifest.json">
+  <style>
+    :root{--bg:#07101e;--panel:#0c1728;--panel2:#101e33;--line:#22324a;--text:#e7edf6;--muted:#91a0b7;--accent:#55d6be;--accent2:#69a9ff;--danger:#ff6b7a;--warn:#ffc857;--ok:#5ee38f;--shadow:0 24px 70px rgba(0,0,0,.32)}
+    *{box-sizing:border-box}html{background:var(--bg);color:var(--text);font:14px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color-scheme:dark}
+    body{margin:0;min-height:100vh;background:radial-gradient(circle at 12% -10%,rgba(85,214,190,.12),transparent 30%),radial-gradient(circle at 90% 0,rgba(105,169,255,.12),transparent 28%),var(--bg)}
+    button,input,textarea{font:inherit}
+    .shell{width:min(1180px,calc(100% - 32px));margin:0 auto;padding:26px 0 40px}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px}
+    .brand{display:flex;align-items:center;gap:12px}
+    .brand img{width:40px;height:40px}
+    .brand strong{display:block;font-size:16px;letter-spacing:.2px}
+    .brand span{display:block;color:var(--muted);font-size:11px}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .stack{display:grid;gap:10px}
+    .field{display:grid;gap:6px}
+    label{font-size:12px;color:var(--muted)}
+    .label-line{display:flex;justify-content:space-between;gap:10px;align-items:center}
+    .label-note{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;padding:3px 8px;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);background:#0a1928}
+    input,textarea{width:100%;border:1px solid var(--line);border-radius:10px;background:#081321;color:var(--text);padding:10px 11px;outline:none}
+    textarea{min-height:96px;resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.55}
+    input:focus,textarea:focus{border-color:#4d749d;box-shadow:0 0 0 3px rgba(105,169,255,.08)}
+    .btn{border:1px solid var(--line);background:#13243b;color:var(--text);padding:9px 12px;border-radius:10px;font-weight:600;cursor:pointer;transition:transform .15s ease,filter .15s ease,border-color .15s ease}
+    .btn:hover{filter:brightness(1.08)}
+    .btn:active{transform:translateY(1px)}
+    .btn.primary{background:linear-gradient(135deg,#2e8f82,#315f9d);border-color:transparent}
+    .btn.ghost{background:transparent}
+    .btn:disabled{opacity:.45;cursor:not-allowed}
+    .chip{border:1px solid var(--line);background:rgba(16,30,51,.75);padding:7px 10px;border-radius:999px;color:var(--muted);font-size:12px}
+    .chip strong{color:var(--text)}
+    .hero{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:20px;background:linear-gradient(180deg,rgba(16,30,51,.96),rgba(12,23,40,.96));box-shadow:var(--shadow);padding:24px 24px 22px;margin-bottom:16px}
+    .hero:before{content:"";position:absolute;right:-60px;top:-90px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(105,169,255,.22),transparent 68%);pointer-events:none}
+    .hero:after{content:"";position:absolute;left:-70px;bottom:-120px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(85,214,190,.16),transparent 70%);pointer-events:none}
+    .eyebrow{display:inline-flex;align-items:center;gap:8px;color:var(--accent);font-size:12px;text-transform:uppercase;letter-spacing:1.7px;font-weight:800;margin-bottom:12px}
+    .eyebrow i{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 6px rgba(85,214,190,.08)}
+    .hero h1{font-size:clamp(34px,5.2vw,58px);line-height:1.02;letter-spacing:-2.6px;margin:0 0 14px;max-width:760px}
+    .hero p{font-size:16px;color:var(--muted);max-width:780px;margin:0}
+    .hero-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+    .summary-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:22px;position:relative;z-index:1}
+    .summary-card{padding:14px;border:1px solid var(--line);border-radius:14px;background:rgba(10,21,37,.78);box-shadow:inset 0 1px 0 rgba(255,255,255,.02)}
+    .summary-card .kicker{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.7px}
+    .summary-card strong{display:block;font-size:16px;margin:4px 0 6px}
+    .summary-card p{margin:0;font-size:12px;line-height:1.55;color:var(--muted)}
+    .summary-card.good{border-color:#275d4a;background:linear-gradient(145deg,rgba(14,37,32,.9),rgba(10,21,37,.86))}
+    .summary-card.blue{border-color:#31516b;background:linear-gradient(145deg,rgba(13,28,44,.92),rgba(10,21,37,.86))}
+    .summary-card.warn{border-color:#66532a;background:linear-gradient(145deg,rgba(35,29,16,.92),rgba(10,21,37,.84))}
+    .grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px}
+    .card{grid-column:span 12;border:1px solid var(--line);border-radius:16px;background:linear-gradient(180deg,rgba(16,30,51,.94),rgba(12,23,40,.94));box-shadow:var(--shadow);padding:18px;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+    .card:hover{border-color:#304761;box-shadow:0 26px 80px rgba(0,0,0,.38)}
+    .card.span-7{grid-column:span 7}.card.span-5{grid-column:span 5}.card.full{grid-column:span 12}
+    .card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px}
+    .card-head h2{font-size:18px;margin:0}
+    .lead{margin:5px 0 0;color:var(--muted);font-size:13px;line-height:1.5}
+    .step{display:flex;align-items:center;justify-content:center;min-width:28px;height:28px;border-radius:9px;background:rgba(85,214,190,.12);border:1px solid rgba(85,214,190,.24);color:var(--accent);font-size:12px;font-weight:900}
+    .status{min-height:18px;margin-top:10px;color:#a8d3ff;font-size:12px;line-height:1.5;white-space:pre-wrap}
+    .status.error{color:#f6b1b9}
+    .notice{border:1px solid #334a68;background:#0a1c31;padding:11px 12px;border-radius:10px;color:#bdcce0;font-size:12px;line-height:1.55}
+    .notice.warn{border-color:#66532a;background:#231d10;color:#ffe5a4}
+    .notice.good{border-color:#285d47;background:#10231d;color:#bbf7d0}
+    .mini-flow{display:grid;gap:10px;margin-top:14px}
+    .mini-step{display:flex;gap:10px;align-items:flex-start;padding:11px;border-radius:11px;background:rgba(8,18,32,.52);border:1px solid rgba(34,50,74,.9)}
+    .mini-step b{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;border-radius:50%;background:#0d2033;color:var(--accent);font-size:11px}
+    .mini-step span{display:block;color:var(--muted);font-size:12px;line-height:1.45;margin-top:2px}
+    .qr-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .qr-panel{padding:14px;border:1px solid var(--line);border-radius:14px;background:#0a1525}
+    .qr-panel .tag{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;padding:4px 8px;font-size:10px;font-weight:900;letter-spacing:.08em;color:#a8d3ff;background:#0b1b2d;margin-bottom:8px}
+    .qr-panel h3{font-size:14px;margin:0 0 4px}
+    .qr-panel p{font-size:12px;line-height:1.45;color:var(--muted);margin:0 0 12px}
+    .qr-box{background:#fff;padding:10px;border-radius:12px;width:100%;aspect-ratio:1;display:flex;align-items:center;justify-content:center;overflow:hidden}
+    .qr-box:empty:after{content:"Generate credentials to create QR";color:#64748b;text-align:center;font-size:11px;padding:20px}
+    .qr-box img{display:block;width:100%!important;height:100%!important;object-fit:contain;image-rendering:pixelated}
+    .split-panel{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}
+    .payload{padding:14px;border-radius:13px;background:#080d17;border:1px solid #233047}
+    .checklist{display:grid;gap:8px}
+    .check{display:flex;gap:10px;align-items:flex-start;padding:11px;border-radius:11px;background:rgba(15,23,42,.48);border:1px solid rgba(148,163,184,.1)}
+    .check i{width:18px;height:18px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(16,185,129,.13);color:#6ee7b7;font-style:normal;font-size:11px;font-weight:900;flex:0 0 auto}
+    .check div{font-size:12px;color:#cbd5e1;line-height:1.45}
+    .check div span{display:block;color:#718198;margin-top:2px}
+    .footer{text-align:center;color:#5f6e83;font-size:11px;margin-top:18px;line-height:1.6}
+    .footer a{color:#93c5fd;text-decoration:none}
+    code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;word-break:break-all}
+    @media(max-width:980px){.card.span-7,.card.span-5,.card.full{grid-column:span 12}.summary-strip,.split-panel,.qr-grid{grid-template-columns:1fr}}
+    @media(max-width:720px){.topbar{align-items:flex-start;flex-direction:column}.shell{width:min(100%,calc(100% - 24px));padding-top:18px}.hero h1{letter-spacing:-2px}.summary-strip{grid-template-columns:1fr}.hero-actions .btn,.row .btn{width:100%}}
+  </style>
+  <script src="./qrcode.js"></script>
+  <script src="./sodium.js"></script>
+  <script src="./hotpocket-js-client.min.js"></script>
+</head>
+<body>
+  <main class="shell">
+    <div class="topbar">
+      <div class="brand"><img src="../evernode-logo.svg" alt=""><div><strong>EverAdmin Control Plane</strong><span>EV Signer setup · first-party credential generator</span></div></div>
+      <div class="row">
+        <span class="chip"><strong>Local only</strong> · no secrets are submitted</span>
+        <a class="btn ghost" href="../evernode.html">Return to EverAdmin</a>
+      </div>
+    </div>
+
+    <section class="hero">
+      <div class="eyebrow"><i></i> EV Signer Setup</div>
+      <h1>Generate a signer profile that feels native to EverAdmin.</h1>
+      <p>This setup page now follows the same visual language as EverAdmin Control Plane and focuses only on the credentials the signer flow actually uses. EverAdmin stores the <strong>public key + OTP</strong>. EV Signer stores the <strong>private key + OTP</strong>.</p>
+      <div class="hero-actions">
+        <button class="btn primary" id="generateAllBtn">Generate signer credentials</button>
+        <button class="btn" id="refreshQrBtn">Show both QR codes</button>
+      </div>
+      <div class="summary-strip">
+        <div class="summary-card good"><div class="kicker">EverAdmin stores</div><strong>Public key + OTP</strong><p>These values belong on the EV Signer user record in consensus state.</p></div>
+        <div class="summary-card blue"><div class="kicker">EV Signer stores</div><strong>Private key + OTP</strong><p>Scan both QR codes into the signer profile and keep the private key backed up safely.</p></div>
+        <div class="summary-card warn"><div class="kicker">Never submit</div><strong>Private key to EverAdmin</strong><p>The private key is for EV Signer and your secure backup only.</p></div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <article class="card span-7">
+        <div class="card-head"><div><h2>1 · Admin keypair</h2><p class="lead">Use a HotPocket admin keypair. The public key identifies the EverAdmin user. The private key stays off-platform.</p></div><span class="step">01</span></div>
+        <div class="field"><label class="label-line"><span>Admin private key</span><span class="label-note">EV Signer secret</span></label><textarea id="adminPrivateKey" spellcheck="false" placeholder="ed..."></textarea></div>
+        <div class="row"><button class="btn primary" id="generateKeyBtn">Generate keypair</button><button class="btn" id="deriveKeyBtn">Show QR</button><button class="btn" data-copy="adminPrivateKey" data-status="adminStatus">Copy private key</button></div>
+        <div class="field"><label class="label-line"><span>Admin public key</span><span class="label-note">EverAdmin credential</span></label><textarea id="adminPublicKey" readonly spellcheck="false" placeholder="ed..."></textarea></div>
+        <div class="row"><button class="btn" data-copy="adminPublicKey" data-status="adminStatus">Copy public key</button></div>
+        <div class="notice warn"><strong>Private means private.</strong> EverAdmin should never store this private key. Keep this tab open until you have imported it into EV Signer and saved a secure backup.</div>
+        <div id="adminStatus" class="status"></div>
+      </article>
+
+      <article class="card span-5">
+        <div class="card-head"><div><h2>2 · Signer OTP</h2><p class="lead">This shared secret is stored on the EverAdmin user and in the matching EV Signer profile.</p></div><span class="step">02</span></div>
+        <div class="field"><label class="label-line"><span>OTP secret</span><span class="label-note">Shared by both</span></label><textarea id="otpSecret" spellcheck="false" placeholder="Base32 secret"></textarea></div>
+        <div class="row"><button class="btn primary" id="generateOtpBtn">Generate OTP</button><button class="btn" id="showOtpQrBtn">Show QR</button><button class="btn" data-copy="otpSecret" data-status="otpStatus">Copy OTP</button></div>
+        <div class="notice good">EV Signer uses this secret to create the rolling 24-digit code that encrypts its EverAdmin authorization envelope.</div>
+        <div class="mini-flow">
+          <div class="mini-step"><b>1</b><div>Put this OTP on the EverAdmin user record.<span>It enables OTP-aware EV Signer authentication for that user.</span></div></div>
+          <div class="mini-step"><b>2</b><div>Import the same OTP into EV Signer.<span>The signer needs the same secret so it can authorize the browser login.</span></div></div>
+        </div>
+        <div id="otpStatus" class="status"></div>
+      </article>
+
+      <article class="card full">
+        <div class="card-head"><div><h2>3 · Scan into EV Signer</h2><p class="lead">These payloads match the import formats accepted by your EV Signer app.</p></div><span class="step">03</span></div>
+        <div class="qr-grid">
+          <div class="qr-panel"><div class="tag">Signer import</div><h3>Admin private key QR</h3><p>Import payload: <code>{"adminPrivateKey":"ed..."}</code></p><div id="adminKeyQr" class="qr-box"></div></div>
+          <div class="qr-panel"><div class="tag">Signer import</div><h3>OTP secret QR</h3><p>Import payload: <code>{"otpSecret":"..."}</code></p><div id="otpQr" class="qr-box"></div></div>
+        </div>
+      </article>
+
+      <article class="card full">
+        <div class="card-head"><div><h2>4 · Register the user in EverAdmin</h2><p class="lead">Only these two values belong on the EV Signer user record.</p></div><span class="step">04</span></div>
+        <div class="split-panel">
+          <div class="payload">
+            <div class="field"><label>Signer public key</label><textarea id="registrationPublicKey" readonly placeholder="ed..."></textarea></div>
+            <div class="field"><label>Signer OTP secret</label><textarea id="registrationOtp" readonly placeholder="Base32 OTP secret"></textarea></div>
+            <div class="row"><button class="btn primary" id="copyRegistrationBtn">Copy EverAdmin registration JSON</button></div>
+            <div id="registrationStatus" class="status"></div>
+          </div>
+          <div class="checklist">
+            <div class="check"><i>✓</i><div>Authentication method: EV Signer<span>Use the public key above as the user’s signer public key.</span></div></div>
+            <div class="check"><i>✓</i><div>Enable signer OTP<span>Use the same OTP secret shown above for that specific user.</span></div></div>
+            <div class="check"><i>✓</i><div>Never paste the private key into EverAdmin<span>It belongs only in EV Signer and your own secure backup workflow.</span></div></div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <div class="footer">Credentials are generated locally in your browser. This page does not submit them to EverAdmin automatically. <a href="./terms.md" target="_blank" rel="noopener noreferrer">Security notes</a>.</div>
+  </main>
+
+<script>
+const BASE32_ALPHABET='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+const $=id=>document.getElementById(id);
+const val=id=>($(id)?.value||'').trim();
+function setVal(id,v){if($(id))$(id).value=v||''}
+function status(id,msg,error=false){const el=$(id);if(!el)return;el.textContent=msg||'';el.classList.toggle('error',!!error)}
+function bytesToHex(bytes){return Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('')}
+function hexToBytes(hex){const clean=String(hex||'').trim();if(clean.length%2)throw new Error('Invalid hex length.');const out=new Uint8Array(clean.length/2);for(let i=0;i<out.length;i++)out[i]=parseInt(clean.slice(i*2,i*2+2),16);return out}
+function normalizeHotPocketKey(raw,kind){if(!raw)throw new Error(`HotPocket did not return a ${kind} key.`);let hex='';if(typeof raw==='string')hex=raw.trim();else if(raw instanceof Uint8Array||Array.isArray(raw))hex=Array.from(raw,b=>b.toString(16).padStart(2,'0')).join('');else if(raw.data&&Array.isArray(raw.data))hex=Array.from(raw.data,b=>b.toString(16).padStart(2,'0')).join('');else throw new Error(`Unsupported HotPocket ${kind} key format.`);hex=hex.toLowerCase();if(hex.startsWith('ed'))hex=hex.slice(2);if(hex.startsWith('ed'))hex=hex.slice(2);if(!/^[0-9a-f]+$/.test(hex))throw new Error(`Invalid HotPocket ${kind} key hex.`);const expected=kind==='private'?128:64;if(hex.length!==expected)throw new Error(`Invalid ${kind} key length: got ${hex.length}, expected ${expected} hex characters.`);return `ed${hex}`}
+async function derivePublic(privateKey=val('adminPrivateKey')){if(typeof sodium==='undefined')throw new Error('sodium.js is not loaded.');await sodium.ready;let key=String(privateKey||'').trim().toLowerCase().replace(/^ed/i,'');if(!key)throw new Error('Admin private key is required.');if(!/^[0-9a-f]+$/.test(key))throw new Error('Invalid admin private key hex.');if(key.length!==64&&key.length!==128)throw new Error(`Unsupported admin private key length: ${key.length} hex characters.`);const seed=hexToBytes(key.length===128?key.slice(0,64):key);const kp=sodium.crypto_sign_seed_keypair(seed);return normalizeHotPocketKey(kp.publicKey||kp.public||kp.pk,'public').toLowerCase()}
+function randomBytes(n){const b=new Uint8Array(n);crypto.getRandomValues(b);return b}
+function base32Encode(bytes){let bits='',out='';for(const b of bytes)bits+=b.toString(2).padStart(8,'0');for(let i=0;i<bits.length;i+=5)out+=BASE32_ALPHABET[parseInt(bits.slice(i,i+5).padEnd(5,'0'),2)];return out}
+function validateOtp(secret){const clean=String(secret||'').replace(/=+$/g,'').replace(/\s+/g,'').toUpperCase();if(!/^[A-Z2-7]+$/.test(clean))throw new Error('OTP must be Base32 using A-Z and 2-7.');if(clean.length<16)throw new Error('OTP secret is too short.');return clean}
+function makeQr(id,text){const el=$(id);if(!el)return;el.innerHTML='';const qr=qrcode(0,'M');qr.addData(text);qr.make();el.innerHTML=qr.createImgTag(6,8);const img=el.querySelector('img');if(img){img.alt='QR code';img.style.width='100%';img.style.height='100%'}}
+function clearQr(id){if($(id))$(id).innerHTML=''}
+function syncRegistration(){setVal('registrationPublicKey',val('adminPublicKey'));setVal('registrationOtp',val('otpSecret'))}
+async function refreshQrs(){try{const priv=val('adminPrivateKey');if(priv)makeQr('adminKeyQr',JSON.stringify({adminPrivateKey:priv}));else clearQr('adminKeyQr');const otp=val('otpSecret');if(otp){const clean=validateOtp(otp);setVal('otpSecret',clean);makeQr('otpQr',JSON.stringify({otpSecret:clean}))}else clearQr('otpQr');syncRegistration();status('registrationStatus','QR codes and EverAdmin registration values refreshed.')}catch(e){status('registrationStatus',e.message,true)}}
+async function generateKey(){try{if(typeof HotPocket==='undefined'||!HotPocket.generateKeys)throw new Error('HotPocket client is not loaded.');const kp=await HotPocket.generateKeys();const priv=normalizeHotPocketKey(kp.privateKey||kp.private||kp.secretKey||kp.secret||kp.sk,'private');const pub=normalizeHotPocketKey(kp.publicKey||kp.public||kp.pk,'public');setVal('adminPrivateKey',priv);setVal('adminPublicKey',pub);syncRegistration();makeQr('adminKeyQr',JSON.stringify({adminPrivateKey:priv}));status('adminStatus',`Keypair generated locally.
+Public key: ${pub}`);return {priv,pub}}catch(e){status('adminStatus',e.message,true);throw e}}
+async function deriveKey(){try{const pub=await derivePublic();setVal('adminPublicKey',pub);syncRegistration();if(val('adminPrivateKey'))makeQr('adminKeyQr',JSON.stringify({adminPrivateKey:val('adminPrivateKey')}));status('adminStatus',`Public key derived.
+${pub}`);return pub}catch(e){status('adminStatus',e.message,true);throw e}}
+function showOtpQr(){try{const otp=validateOtp(val('otpSecret'));setVal('otpSecret',otp);setVal('registrationOtp',otp);makeQr('otpQr',JSON.stringify({otpSecret:otp}));syncRegistration();status('otpStatus','OTP QR ready.');status('registrationStatus','OTP validated locally and its QR is ready to scan.');return otp}catch(e){clearQr('otpQr');status('otpStatus',e.message,true);throw e}}
+function generateOtp(){try{const otp=base32Encode(randomBytes(32));setVal('otpSecret',otp);showOtpQr();status('otpStatus','OTP secret generated locally. QR ready.');return otp}catch(e){status('otpStatus',e.message,true);throw e}}
+async function generateAll(){const btn=$('generateAllBtn');btn.disabled=true;try{await generateKey();generateOtp();syncRegistration();status('registrationStatus','Ready. Register the public key + OTP in EverAdmin, then scan both QR codes into EV Signer.')}catch(e){status('registrationStatus',e.message,true)}finally{btn.disabled=false}}
+async function copyText(text,statusId){if(!text)throw new Error('Nothing to copy.');try{await navigator.clipboard.writeText(text);status(statusId,'Copied.')}catch{const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();status(statusId,'Copied.')}}
+$('generateAllBtn').onclick=generateAll;$('generateKeyBtn').onclick=()=>generateKey();$('deriveKeyBtn').onclick=()=>deriveKey();$('generateOtpBtn').onclick=()=>generateOtp();$('showOtpQrBtn').onclick=()=>showOtpQr();$('refreshQrBtn').onclick=()=>refreshQrs();
+document.querySelectorAll('[data-copy]').forEach(btn=>btn.onclick=async()=>{try{await copyText(val(btn.dataset.copy),btn.dataset.status)}catch(e){status(btn.dataset.status,e.message,true)}});
+$('copyRegistrationBtn').onclick=async()=>{try{const publicKey=val('adminPublicKey')||await deriveKey();const otpSecret=validateOtp(val('otpSecret'));const payload={authenticationMethod:'everstoring',publicKey,otpSecret};await copyText(JSON.stringify(payload,null,2),'registrationStatus')}catch(e){status('registrationStatus',e.message,true)}};
+$('adminPrivateKey').addEventListener('input',()=>{setVal('adminPublicKey','');setVal('registrationPublicKey','');clearQr('adminKeyQr');status('adminStatus','Private key changed. Derive the public key before registering it.')});
+$('otpSecret').addEventListener('input',()=>{setVal('registrationOtp',val('otpSecret'));clearQr('otpQr');status('otpStatus','OTP changed. Refresh QR codes before importing.')});
+async function registerServiceWorker(){if('serviceWorker'in navigator){try{await navigator.serviceWorker.register('./sw.js')}catch{}}}
+registerServiceWorker();
+</script>
+</body>
+</html>

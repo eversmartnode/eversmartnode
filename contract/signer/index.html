@@ -1,0 +1,2846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+
+  <title>Everstoring Remote Signer</title>
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#0f1115">
+  <meta name="application-name" content="EV Signer">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="EV Signer">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no">
+
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html,
+    body {
+      touch-action: manipulation;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+
+    body {
+      margin: 0;
+      background: #0f1115;
+      color: white;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      padding: 20px;
+    }
+
+    body.scanner-open {
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+    }
+
+    .title {
+      font-size: 30px;
+      font-weight: 850;
+      margin-bottom: 6px;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      color: #9ca3af;
+      margin-bottom: 22px;
+      line-height: 1.45;
+    }
+
+    .card {
+      background: #181c23;
+      border: 1px solid #252b35;
+      border-radius: 16px;
+      padding: 18px;
+      margin-bottom: 16px;
+    }
+
+    h1,
+    h2 {
+      margin-top: 0;
+    }
+
+    h2 {
+      margin: 0 0 8px;
+      font-size: 22px;
+    }
+
+    label {
+      display: block;
+      margin: 14px 0 6px;
+      font-size: 14px;
+      font-weight: 750;
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      background: #0f1115;
+      color: #fff;
+      border: 1px solid #303846;
+      border-radius: 10px;
+      padding: 11px 12px;
+      font-size: 16px;
+      line-height: 1.35;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      outline: none;
+      touch-action: manipulation;
+    }
+
+    textarea {
+      min-height: 104px;
+      resize: vertical;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+    }
+
+    button {
+      background: #2563eb;
+      color: white;
+      border: 0;
+      border-radius: 10px;
+      padding: 11px 14px;
+      font-size: 16px;
+      font-weight: 850;
+      cursor: pointer;
+      margin-top: 10px;
+      touch-action: manipulation;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    button.secondary {
+      background: #374151;
+    }
+
+    button.secondary:hover {
+      background: #4b5563;
+    }
+
+    button.success {
+      background: #059669;
+    }
+
+    button.success:hover {
+      background: #047857;
+    }
+
+    button.warning {
+      background: #b45309;
+    }
+
+    button.warning:hover {
+      background: #92400e;
+    }
+
+    button.danger {
+      background: #991b1b;
+    }
+
+    button.danger:hover {
+      background: #7f1d1d;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    .status {
+      min-height: 22px;
+      margin-top: 10px;
+      color: #93c5fd;
+      font-size: 14px;
+      white-space: pre-wrap;
+    }
+
+    .status.error {
+      color: #fca5a5;
+    }
+
+    .hint {
+      color: #9ca3af;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .warning-box {
+      background: rgba(180, 83, 9, 0.12);
+      border: 1px solid rgba(251, 191, 36, 0.35);
+      color: #fde68a;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .install-only {
+      max-width: 760px;
+      margin: 36px auto;
+    }
+
+    .install-step {
+      color: #d1d5db;
+      line-height: 1.55;
+      margin-top: 10px;
+    }
+
+    .install-hero {
+      display: grid;
+      gap: 10px;
+      margin: 18px 0 10px;
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(52, 211, 153, 0.32);
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.13), rgba(59, 130, 246, 0.10));
+    }
+
+    .install-hero strong {
+      font-size: 15px;
+    }
+
+    #installPwaBtn {
+      font-weight: 800;
+      font-size: 16px;
+      min-height: 48px;
+    }
+
+    .scanner-wrap {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 999999;
+      background: rgba(5, 7, 10, 0.96);
+      padding: max(18px, env(safe-area-inset-top))
+               max(18px, env(safe-area-inset-right))
+               max(18px, env(safe-area-inset-bottom))
+               max(18px, env(safe-area-inset-left));
+      align-items: center;
+      justify-content: center;
+    }
+
+    .scanner-wrap.active {
+      display: flex;
+    }
+
+    .scanner-panel {
+      width: 100%;
+      max-width: 520px;
+    }
+
+    .scanner-label {
+      color: #93c5fd;
+      font-size: 16px;
+      font-weight: 850;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    .scanner-overlay-status {
+      color: #93c5fd;
+      font-size: 14px;
+      text-align: center;
+      white-space: pre-wrap;
+      margin-bottom: 10px;
+      min-height: 20px;
+    }
+
+    .scanner-frame {
+      position: relative;
+      overflow: hidden;
+      border-radius: 18px;
+      background: black;
+      border: 2px solid #3b82f6;
+      box-shadow: 0 20px 80px rgba(0, 0, 0, 0.55);
+      aspect-ratio: 1 / 1;
+    }
+
+    .scanner-frame::after {
+      content: "";
+      position: absolute;
+      inset: 18%;
+      border: 3px solid rgba(147, 197, 253, 0.95);
+      border-radius: 18px;
+      pointer-events: none;
+    }
+
+    .scanner-frame::before {
+      content: "";
+      position: absolute;
+      left: 18%;
+      right: 18%;
+      top: 50%;
+      height: 2px;
+      background: rgba(52, 211, 153, 0.95);
+      box-shadow: 0 0 18px rgba(52, 211, 153, 0.8);
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: black;
+      display: block;
+    }
+
+    .scanner-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .scanner-actions button {
+      flex: 1;
+    }
+
+    pre {
+      background: #111827;
+      border: 1px solid #303846;
+      border-radius: 12px;
+      padding: 12px;
+      color: #d1d5db;
+      overflow: auto;
+      white-space: pre-wrap;
+      font-size: 13px;
+    }
+
+    .mini-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    code {
+      color: #bfdbfe;
+    }
+
+    .small-muted {
+      color: #9ca3af;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .sensitive-toggle-row {
+      display: flex;
+      justify-content: flex-start;
+      margin: 6px 0 8px;
+    }
+
+    .sensitive-toggle-row button {
+      margin-top: 2px;padding:3px 8px;font-size:12px;font-weight:500;
+    }
+
+    textarea.sensitive-hidden-field {
+      min-height: 86px;
+    }
+
+
+    .terms-modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1000000;
+      background:
+        radial-gradient(circle at top, rgba(37, 99, 235, 0.18), transparent 38%),
+        rgba(5, 7, 10, 0.88);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: max(18px, env(safe-area-inset-top))
+               max(18px, env(safe-area-inset-right))
+               max(18px, env(safe-area-inset-bottom))
+               max(18px, env(safe-area-inset-left));
+      align-items: center;
+      justify-content: center;
+    }
+
+    .terms-modal-backdrop.active {
+      display: flex;
+    }
+
+    body.terms-open {
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    .terms-modal {
+      width: 100%;
+      max-width: 760px;
+      max-height: min(84vh, 780px);
+      display: flex;
+      flex-direction: column;
+      background: linear-gradient(180deg, #1b2230 0%, #111827 100%);
+      border: 1px solid rgba(147, 197, 253, 0.22);
+      border-radius: 22px;
+      box-shadow: 0 28px 110px rgba(0, 0, 0, 0.65);
+      overflow: hidden;
+    }
+
+    .terms-modal-header {
+      padding: 22px 22px 14px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+    }
+
+    .terms-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: #bfdbfe;
+      background: rgba(59, 130, 246, 0.12);
+      border: 1px solid rgba(59, 130, 246, 0.24);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 850;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .terms-modal-title {
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      margin: 0 0 6px;
+    }
+
+    .terms-modal-subtitle {
+      color: #9ca3af;
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    .terms-content {
+      padding: 18px 22px;
+      overflow: auto;
+      color: #d1d5db;
+      line-height: 1.58;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+    }
+
+    .terms-content h1,
+    .terms-content h2,
+    .terms-content h3 {
+      color: #fff;
+      margin: 18px 0 8px;
+      line-height: 1.2;
+    }
+
+    .terms-content h1:first-child,
+    .terms-content h2:first-child,
+    .terms-content h3:first-child {
+      margin-top: 0;
+    }
+
+    .terms-content h1 {
+      font-size: 24px;
+    }
+
+    .terms-content h2 {
+      font-size: 19px;
+    }
+
+    .terms-content h3 {
+      font-size: 16px;
+    }
+
+    .terms-content p {
+      margin: 0 0 12px;
+    }
+
+    .terms-content ul {
+      margin: 8px 0 14px;
+      padding-left: 22px;
+    }
+
+    .terms-content li {
+      margin-bottom: 7px;
+    }
+
+    .terms-content strong {
+      color: #fef3c7;
+    }
+
+    .terms-modal-footer {
+      padding: 16px 22px 20px;
+      background: rgba(15, 17, 21, 0.52);
+    }
+
+    .terms-check-row {
+      display: flex;
+      gap: 11px;
+      align-items: flex-start;
+      color: #d1d5db;
+      font-size: 14px;
+      line-height: 1.45;
+      margin-bottom: 14px;
+    }
+
+    .terms-check-row input {
+      width: 18px;
+      min-width: 18px;
+      height: 18px;
+      margin-top: 2px;
+      accent-color: #2563eb;
+    }
+
+    .terms-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .terms-actions button {
+      margin-top: 0;
+    }
+
+    .terms-actions button:disabled {
+      opacity: 0.48;
+      cursor: not-allowed;
+      background: #374151;
+    }
+
+    .terms-load-error {
+      color: #fca5a5;
+    }
+
+    @media (max-width: 760px) {
+      body {
+        padding: 16px;
+      }
+
+      .title {
+        font-size: 26px;
+      }
+
+      .mini-grid {
+        grid-template-columns: 1fr;
+      }
+
+      button {
+        width: 100%;
+      }
+
+      .scanner-actions {
+        flex-direction: column;
+      }
+    }
+  </style>
+
+<script src="./jsQR.js"></script>
+<script src="./sodium.js"></script>
+<script src="./bson.bundle.min.js"></script>
+
+<script>
+(function () {
+  function toUint8Array(value, encoding) {
+    if (typeof value === "string") {
+      if (encoding === "hex") {
+        const clean = value.trim();
+        const out = new Uint8Array(Math.floor(clean.length / 2));
+
+        for (let i = 0; i < out.length; i++) {
+          out[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+        }
+
+        return out;
+      }
+
+      if (encoding === "base64") {
+        const binary = atob(value);
+        const out = new Uint8Array(binary.length);
+
+        for (let i = 0; i < binary.length; i++) {
+          out[i] = binary.charCodeAt(i);
+        }
+
+        return out;
+      }
+
+      return new TextEncoder().encode(value);
+    }
+
+    if (value instanceof Uint8Array) return value;
+    if (value instanceof ArrayBuffer) return new Uint8Array(value);
+
+    if (ArrayBuffer.isView(value)) {
+      return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+    }
+
+    if (Array.isArray(value)) return new Uint8Array(value);
+    if (typeof value === "number") return new Uint8Array(value);
+
+    return new Uint8Array();
+  }
+
+  function BufferShim(value, encoding) {
+    return BufferShim.from(value, encoding);
+  }
+
+  BufferShim.from = function (value, encoding) {
+    return toUint8Array(value, encoding);
+  };
+
+  BufferShim.alloc = function (size) {
+    return new Uint8Array(size);
+  };
+
+  BufferShim.concat = function (items) {
+    const arrays = items.map((item) => toUint8Array(item));
+    const total = arrays.reduce((sum, item) => sum + item.length, 0);
+    const out = new Uint8Array(total);
+
+    let offset = 0;
+
+    for (const item of arrays) {
+      out.set(item, offset);
+      offset += item.length;
+    }
+
+    return out;
+  };
+
+  BufferShim.isBuffer = function (value) {
+    return value instanceof Uint8Array || ArrayBuffer.isView(value);
+  };
+
+  window.Buffer = BufferShim;
+  globalThis.Buffer = BufferShim;
+
+  if (typeof self !== "undefined") {
+    self.Buffer = BufferShim;
+  }
+})();
+</script>
+
+<script>
+var Buffer = globalThis.Buffer;
+</script>
+
+<script src="./hotpocket-js-client.min.js"></script>
+
+</head>
+
+<body>
+<input
+  id="qrImageInput"
+  type="file"
+  accept="image/*"
+  style="display:none">
+
+
+<div id="termsModal" class="terms-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="termsModalTitle">
+  <div class="terms-modal">
+    <div class="terms-modal-header">
+      <div class="terms-kicker">Proof of Concept</div>
+      <h2 id="termsModalTitle" class="terms-modal-title">Terms & Conditions</h2>
+      <p class="terms-modal-subtitle">
+        Please read and accept before using Everstoring Remote Signer.
+      </p>
+    </div>
+
+    <div id="termsContent" class="terms-content">
+      Loading terms...
+    </div>
+
+    <div class="terms-modal-footer">
+      <label class="terms-check-row">
+        <input id="termsAcceptCheck" type="checkbox">
+        <span>
+          I understand this is experimental proof-of-concept software, I use it at my own risk,
+          and I accept the Terms & Conditions.
+        </span>
+      </label>
+
+      <div class="terms-actions">
+        <button id="termsReloadBtn" type="button" class="secondary">
+          Reload Terms
+        </button>
+        <button id="termsAcceptBtn" type="button" class="success" disabled>
+          Accept & Continue
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<div id="installerView" class="install-only hidden">
+  <div class="card">
+    <h1>Install EV Signer</h1>
+
+    <div class="warning-box">
+      This installer snapshots the complete EV Signer app onto this device. After the local snapshot is ready, signer UI/assets are cache-only: if the website disappears, the installed signer still opens from its local copy instead of falling back to the site.
+    </div>
+
+    <div class="install-hero">
+      <strong>1. Lock the signer locally. 2. Install it.</strong>
+      <div id="installerCacheStatus" class="status">Preparing local signer snapshot…</div>
+      <button id="installPwaBtn" class="success" type="button" onclick="installSignerPwa()">
+        Install EV Signer
+      </button>
+    </div>
+
+    <div class="install-step">
+      <strong>iPhone / Safari:</strong><br>
+      Apple does not expose a one-tap web install prompt. Tap Share → Add to Home Screen, then open EV Signer from its Home Screen icon.
+    </div>
+
+    <div class="install-step">
+      <strong>Chrome / Android / desktop:</strong><br>
+      Use the Install EV Signer button above. If the browser does not expose the native prompt, use its menu → Install App / Add to Home Screen.
+    </div>
+
+    <div class="row">
+      <button class="secondary" onclick="setVisible('installerView', false); setVisible('appView', true);">
+        Open Signer Without Installing
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="appView" class="container hidden">
+
+
+  <div class="card">
+    <div class="warning-box">
+      This app generates signers locally on this device.
+      Saved profiles are stored in this browser/app storage. Use only on a trusted phone.
+    </div>
+    <div id="onlineStatus" class="status"></div>
+    <div id="cacheStatus" class="status"></div>
+  </div>
+
+  <div class="card">
+    <h2>Scan QR</h2>
+    <div class="hint">
+      Scan a QR code from any compatible app. If live camera does not show frames in iOS PWA mode, use Take QR Photo and select a screenshot/photo of the QR.
+    </div>
+    <div class="row">
+      <button onclick="startScanner('signUrl')">Scan Sign Request QR</button>
+      <button class="secondary" onclick="scanQrFromPhoto('signUrl')">Take QR Photo</button>
+      <button class="warning" onclick="clearRequest()">Clear Request</button>
+    </div>
+
+    <div id="scanStatus" class="status"></div>
+    <div class="sensitive-toggle-row">
+      <button
+        id="signUrlToggleBtn"
+        type="button"
+        class="secondary"
+        aria-controls="signUrl"
+        aria-expanded="false"
+        onclick="toggleSensitiveField('signUrl', 'signUrlToggleBtn', 'Signing URL')">
+        Show Signing URL
+      </button>
+    </div>
+    <textarea
+      id="signUrl"
+      class="hidden sensitive-hidden-field"
+      placeholder="https://your-server.example/api/sign-request/abc123"></textarea>
+
+
+  </div>
+
+  <div class="card">
+    <h2>Review + Sign</h2>
+
+    <label>Request Details</label>
+    <pre id="requestDetails">No request loaded yet.</pre>
+
+    <div class="row">
+      <button class="success" onclick="signAndSend()">Sign + Send</button>
+      <button class="secondary" onclick="generateEnvelopeOnly()">Generate Envelope Only</button>
+      <button class="secondary" onclick="copyEnvelope()">Copy Envelope</button>
+    </div>
+
+    <label>Generated Envelope</label>
+    <div class="sensitive-toggle-row">
+      <button
+        id="generatedEnvelopeToggleBtn"
+        type="button"
+        class="secondary"
+        aria-controls="generatedEnvelope"
+        aria-expanded="false"
+        onclick="toggleSensitiveField('generatedEnvelope', 'generatedEnvelopeToggleBtn', 'Generated Envelope')">
+        Show Generated Envelope
+      </button>
+    </div>
+    <textarea
+      id="generatedEnvelope"
+      class="hidden sensitive-hidden-field"
+      readonly
+      placeholder="evadmin:v1:..."></textarea>
+
+    <label>Remote Response</label>
+    <pre id="remoteResponse">No response yet.</pre>
+
+    <div id="signStatus" class="status"></div>
+  </div>
+  <div class="card">
+    <h2>Signer Profiles</h2>
+    <div class="hint">
+      Add multiple OTP secret + admin private key pairs. You can type them, scan QR live, or import QR from a photo/screenshot.
+    </div>
+
+    <label>Saved Profiles</label>
+    <select id="profileSelect" onchange="onProfileSelected()"></select>
+
+    <div class="mini-grid">
+      <div>
+        <label>Profile Name</label>
+        <input id="profileName" placeholder="Example: Main Admin">
+      </div>
+
+      <div>
+        <label>Selected Profile</label>
+        <input id="selectedProfileDisplay" readonly placeholder="No profile selected">
+      </div>
+    </div>
+
+    <label>OTP Secret</label>
+    <textarea id="otpSecret" placeholder="Base32 OTP secret or otpauth:// QR"></textarea>
+
+    <label>Admin Private Key</label>
+    <input id="adminPrivateKey" type="password" placeholder="ed...">
+
+    <div class="row">
+      <button onclick="startScanner('otp')">Scan OTP Secret QR</button>
+      <button onclick="startScanner('adminKey')">Scan Admin Key QR</button>
+      <button class="secondary" onclick="scanQrFromPhoto('otp')">Photo OTP QR</button>
+      <button class="secondary" onclick="scanQrFromPhoto('adminKey')">Photo Admin QR</button>
+    </div>
+
+    <div class="row">
+      <button class="success" onclick="saveProfile()">Save Profile</button>
+      <button class="secondary" onclick="newProfile()">New Profile</button>
+      <button class="danger" onclick="deleteSelectedProfile()">Delete Profile</button>
+    </div>
+
+    <div id="secretStatus" class="status"></div>
+  </div>
+
+</div>
+
+<div id="scannerWrap" class="scanner-wrap">
+  <div class="scanner-panel">
+    <div id="scannerLabel" class="scanner-label">
+      Camera active — point at QR code
+    </div>
+
+    <div id="scannerOverlayStatus" class="scanner-overlay-status"></div>
+
+    <div id="scannerFrame" class="scanner-frame"></div>
+
+    <div class="scanner-actions">
+      <button type="button" class="secondary" onclick="scanQrFromPhoto()">
+        Take QR Photo
+      </button>
+
+      <button type="button" class="secondary" onclick="stopScanner()">
+        Stop Camera
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+const ADMIN_ENVELOPE_PREFIX = "evadmin:v1:";
+const OTP_CODE_DIGITS = 24;
+const ADMIN_ENVELOPE_ITERATIONS = 300000;
+const PROFILE_STORAGE_KEY = "evSignerProfilesV1";
+const SELECTED_PROFILE_KEY = "evSignerSelectedProfileV1";
+const SIGNER_CACHE_NAME = "everstoring-signer-LOCKED-v2";
+let deferredInstallPrompt = null;
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  const button = document.getElementById("installPwaBtn");
+  if (button) {
+    button.disabled = false;
+    button.textContent = "Install EV Signer";
+  }
+  setInstallerStatus("Local snapshot ready. Native install prompt is available.");
+});
+
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+  setInstallerStatus("EV Signer installed. Its app shell is locked to local storage.");
+});
+
+const TERMS_ACCEPTANCE_VERSION = "signer-poc-terms-v1";
+const TERMS_STORAGE_KEY = "everstoringSignerTermsAcceptedVersion";
+const TERMS_FILE_URL = "./signer_terms.md";
+
+const FALLBACK_TERMS_MD = `
+# Everstoring Remote Signer — Terms & Conditions
+
+_Last updated: 2026-05-28_
+
+## 1. Proof of concept only
+
+Everstoring Remote Signer is experimental proof-of-concept software. It is provided only for testing, learning, research, and experimentation.
+
+It is not intended for production use, commercial use, custody of valuable assets, or any security-critical environment.
+
+## 2. Use at your own risk
+
+By using this software, you understand and agree that you use it entirely at your own risk.
+
+You are responsible for reviewing the code, understanding what it does, protecting your devices, protecting your secrets, and deciding whether this software is suitable for your own experiments.
+
+## 3. No warranty
+
+This software is provided "as is" and "as available", without warranties of any kind.
+
+There is no guarantee that it will be secure, reliable, correct, uninterrupted, compatible with your device, or free from defects, vulnerabilities, data loss, or unexpected behavior.
+
+## 4. Private keys and secrets
+
+This signer may store signer profiles, OTP secrets, and admin private keys in browser or PWA storage on your device.
+
+You are solely responsible for securing your device, browser profile, backups, screenshots, QR codes, exported files, and any other place where secrets may appear.
+
+Do not use real production keys or valuable wallets with this proof-of-concept signer.
+
+## 5. No liability
+
+To the maximum extent permitted by law, the creator, contributors, and distributors are not liable for any loss, damage, claim, cost, or consequence arising from use of this software.
+
+This includes, but is not limited to, loss of funds, loss of access, leaked keys, corrupted data, failed deployments, downtime, security incidents, device compromise, or mistakes made while testing.
+
+## 6. No professional advice
+
+Nothing in this software or its documentation is financial, legal, security, operational, or professional advice.
+
+You should obtain independent professional advice before using similar systems in any real production or value-bearing environment.
+
+## 7. Experimental changes
+
+The software may change at any time. Features may be incomplete, removed, broken, or incompatible with previous versions.
+
+You should expect bugs and should keep independent backups of anything important.
+
+## 8. Acceptance
+
+By selecting "Accept & Continue", you confirm that you have read these terms, understand the experimental nature of the software, and agree to use it only at your own risk.
+`.trim();
+
+function termsStorageGet() {
+  try {
+    return localStorage.getItem(TERMS_STORAGE_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function termsStorageSet(value) {
+  try {
+    localStorage.setItem(TERMS_STORAGE_KEY, value);
+  } catch {
+    // If storage is blocked, acceptance will only last for this current page session.
+    window.__termsAcceptedInMemory = value;
+  }
+}
+
+function hasAcceptedTerms() {
+  return (
+    termsStorageGet() === TERMS_ACCEPTANCE_VERSION ||
+    window.__termsAcceptedInMemory === TERMS_ACCEPTANCE_VERSION
+  );
+}
+
+function escapeTermsHtml(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function inlineTermsMarkdown(value) {
+  return escapeTermsHtml(value)
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>");
+}
+
+function termsMarkdownToHtml(markdown) {
+  const lines = String(markdown || "").replace(/\r/g, "").split("\n");
+  const out = [];
+  let inList = false;
+  let paragraph = [];
+
+  function flushParagraph() {
+    if (!paragraph.length) return;
+
+    out.push(`<p>${inlineTermsMarkdown(paragraph.join(" "))}</p>`);
+    paragraph = [];
+  }
+
+  function closeList() {
+    if (!inList) return;
+
+    out.push("</ul>");
+    inList = false;
+  }
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+
+    if (!line) {
+      flushParagraph();
+      closeList();
+      continue;
+    }
+
+    const heading = line.match(/^(#{1,3})\s+(.+)$/);
+
+    if (heading) {
+      flushParagraph();
+      closeList();
+
+      const level = heading[1].length;
+      out.push(`<h${level}>${inlineTermsMarkdown(heading[2])}</h${level}>`);
+      continue;
+    }
+
+    const bullet = line.match(/^[-*]\s+(.+)$/);
+
+    if (bullet) {
+      flushParagraph();
+
+      if (!inList) {
+        out.push("<ul>");
+        inList = true;
+      }
+
+      out.push(`<li>${inlineTermsMarkdown(bullet[1])}</li>`);
+      continue;
+    }
+
+    paragraph.push(line);
+  }
+
+  flushParagraph();
+  closeList();
+
+  return out.join("\n");
+}
+
+async function loadTermsMarkdown() {
+  try {
+    if (!("caches" in window)) {
+      throw new Error("Cache Storage is unavailable");
+    }
+
+    const cached = await caches.match(TERMS_FILE_URL, { ignoreSearch: true });
+    if (!cached) {
+      throw new Error("local terms snapshot is not ready yet");
+    }
+
+    const text = await cached.text();
+    if (!text.trim()) {
+      throw new Error("signer_terms.md is empty");
+    }
+    return text;
+  } catch (err) {
+    return [
+      FALLBACK_TERMS_MD,
+      "",
+      "---",
+      "",
+      `Note: Local signer terms snapshot unavailable (${err.message}). Showing the built-in fallback terms instead.`
+    ].join("\n");
+  }
+}
+
+async function renderTermsContent() {
+  const termsContent = document.getElementById("termsContent");
+
+  if (!termsContent) {
+    return;
+  }
+
+  termsContent.textContent = "Loading terms...";
+
+  const markdown = await loadTermsMarkdown();
+  termsContent.innerHTML = termsMarkdownToHtml(markdown);
+}
+
+function openTermsModal() {
+  const modal = document.getElementById("termsModal");
+
+  if (!modal) {
+    return;
+  }
+
+  modal.classList.add("active");
+  document.body.classList.add("terms-open");
+
+  setTimeout(() => {
+    const check = document.getElementById("termsAcceptCheck");
+    if (check) check.focus();
+  }, 80);
+}
+
+function closeTermsModal() {
+  const modal = document.getElementById("termsModal");
+
+  if (!modal) {
+    return;
+  }
+
+  modal.classList.remove("active");
+  document.body.classList.remove("terms-open");
+}
+
+async function initTermsModal() {
+  const check = document.getElementById("termsAcceptCheck");
+  const acceptBtn = document.getElementById("termsAcceptBtn");
+  const reloadBtn = document.getElementById("termsReloadBtn");
+
+  if (check && acceptBtn) {
+    check.checked = false;
+    acceptBtn.disabled = true;
+
+    check.addEventListener("change", () => {
+      acceptBtn.disabled = !check.checked;
+    });
+
+    acceptBtn.addEventListener("click", () => {
+      if (!check.checked) return;
+
+      termsStorageSet(TERMS_ACCEPTANCE_VERSION);
+      closeTermsModal();
+    });
+  }
+
+  if (reloadBtn) {
+    reloadBtn.addEventListener("click", renderTermsContent);
+  }
+
+  if (!hasAcceptedTerms()) {
+    await renderTermsContent();
+    openTermsModal();
+  }
+}
+
+
+let profiles = [];
+let selectedProfileId = "";
+let loadedRequest = null;
+let scannerStream = null;
+let scannerTimer = null;
+let scannerTarget = "signUrl";
+
+function getBsonLib() {
+  const lib = window.BSON || window.bson?.BSON || window.bson;
+
+  if (!lib || !lib.serialize || !lib.deserialize) {
+    throw new Error("bson.bundle.min.js is not loaded or does not expose BSON.");
+  }
+
+  return lib;
+}
+
+function base64UrlDecodeString(text) {
+  let clean = String(text || "")
+    .replaceAll("-", "+")
+    .replaceAll("_", "/");
+
+  while (clean.length % 4) {
+    clean += "=";
+  }
+
+  return atob(clean);
+}
+
+function normalizeHpOutput(raw) {
+  if (raw instanceof Uint8Array) return raw;
+  if (raw instanceof ArrayBuffer) return new Uint8Array(raw);
+  if (Array.isArray(raw)) return new Uint8Array(raw);
+  if (raw && raw.data && Array.isArray(raw.data)) return new Uint8Array(raw.data);
+  if (raw && raw.buffer instanceof ArrayBuffer) {
+    return new Uint8Array(raw.buffer, raw.byteOffset || 0, raw.byteLength || raw.buffer.byteLength);
+  }
+
+  return raw;
+}
+
+function makeActionId() {
+  return crypto.randomUUID
+    ? crypto.randomUUID()
+    : `sign-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function parseHpLoginFromValue(rawValue) {
+  const raw = String(rawValue || "").trim();
+
+  if (!raw) {
+    return null;
+  }
+
+  // WSS login link format:
+  // wss://host:port?devicePublicKey=ed...&nonce=...&ttlSeconds=86400
+  try {
+    const url = new URL(raw);
+
+    if (url.protocol === "wss:" || url.protocol === "ws:") {
+      const devicePublicKey = String(url.searchParams.get("devicePublicKey") || "").trim();
+      const nonce = String(url.searchParams.get("nonce") || "").trim();
+      const ttlSeconds = Number(url.searchParams.get("ttlSeconds") || 86400);
+      const headAdminPublicKey =
+        String(url.searchParams.get("headAdminPublicKey") || "").trim() || null;
+
+      if (!devicePublicKey) {
+        throw new Error("WSS login link is missing devicePublicKey.");
+      }
+
+      if (!nonce) {
+        throw new Error("WSS login link is missing nonce.");
+      }
+
+      return {
+        type: "everstoring-upload-login-request",
+        v: 1,
+        endpoint: `${url.protocol}//${url.host}`,
+        devicePublicKey,
+        headAdminPublicKey,
+        nonce,
+        createdAtMs: Date.now(),
+        ttlSeconds
+      };
+    }
+  } catch (err) {
+    if (/^wss?:\/\//i.test(raw)) {
+      throw err;
+    }
+  }
+
+  // Keep old raw JSON support.
+  try {
+    const parsed = JSON.parse(raw);
+
+    if (
+      parsed &&
+      (
+        parsed.type === "everstoring-upload-login-request" ||
+        parsed.type === "everstoring-hotpocket-login"
+      )
+    ) {
+      return parsed;
+    }
+  } catch {}
+
+  // Keep old hpLogin=<base64url-json> support.
+  let encoded = "";
+
+  try {
+    const url = new URL(raw);
+    encoded = url.searchParams.get("hpLogin") || "";
+  } catch {
+    encoded = raw.startsWith("hpLogin=") ? raw.slice("hpLogin=".length) : raw;
+  }
+
+  if (!encoded) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(base64UrlDecodeString(encoded));
+
+    if (
+      parsed &&
+      (
+        parsed.type === "everstoring-upload-login-request" ||
+        parsed.type === "everstoring-hotpocket-login"
+      )
+    ) {
+      return parsed;
+    }
+  } catch {}
+
+  return null;
+}
+
+function loadHotPocketLoginRequest(loginRequest) {
+  loadedRequest = {
+    ok: true,
+    mode: "hotpocket-login",
+    appName: "Everstoring Upload",
+    actionName: "Authorize upload browser/device",
+    loginRequest
+  };
+
+  setValue("signUrl", "");
+  hideSensitiveField("signUrl", "signUrlToggleBtn", "Signing URL");
+  setJson("requestDetails", loadedRequest);
+  setJson("remoteResponse", "No response yet.");
+  setStatus("scanStatus", "HotPocket upload login request loaded. Review and tap Sign + Send.");
+  setStatus("signStatus", "");
+}
+
+function hasWebBypass() {
+  const params = new URLSearchParams(location.search);
+
+  return (
+    params.get("web") === "1" ||
+    location.hash === "#web" ||
+    location.hash === "#online"
+  );
+}
+
+function isStandalonePwa() {
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.matchMedia("(display-mode: fullscreen)").matches ||
+    window.navigator.standalone === true
+  );
+}
+
+function setVisible(id, visible) {
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  el.classList.toggle("hidden", !visible);
+}
+
+function setStatus(id, message, isError = false) {
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  el.textContent = message || "";
+  el.classList.toggle("error", !!isError);
+}
+
+function setInstallerStatus(message, isError = false) {
+  setStatus("installerCacheStatus", message, isError);
+}
+
+function errorDetails(err) {
+  return [
+    err && err.name ? `Name: ${err.name}` : "",
+    err && err.message ? `Message: ${err.message}` : "",
+    err && err.stack ? `Stack: ${err.stack}` : ""
+  ].filter(Boolean).join("\n") || String(err);
+}
+
+function setScannerOverlayStatus(message, isError = false) {
+  const el = document.getElementById("scannerOverlayStatus");
+  if (!el) return;
+
+  el.textContent = message || "";
+  el.style.color = isError ? "#fca5a5" : "#93c5fd";
+}
+
+function value(id) {
+  const el = document.getElementById(id);
+  return el ? el.value.trim() : "";
+}
+
+function setValue(id, val) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.value = val || "";
+  }
+}
+
+function setSensitiveFieldVisible(fieldId, buttonId, label, visible) {
+  const field = document.getElementById(fieldId);
+  const button = document.getElementById(buttonId);
+
+  if (!field) {
+    return;
+  }
+
+  field.classList.toggle("hidden", !visible);
+
+  if (button) {
+    button.textContent = visible ? `Hide ${label}` : `Show ${label}`;
+    button.setAttribute("aria-expanded", visible ? "true" : "false");
+  }
+}
+
+function toggleSensitiveField(fieldId, buttonId, label) {
+  const field = document.getElementById(fieldId);
+
+  if (!field) {
+    return;
+  }
+
+  setSensitiveFieldVisible(
+    fieldId,
+    buttonId,
+    label,
+    field.classList.contains("hidden")
+  );
+}
+
+function hideSensitiveField(fieldId, buttonId, label) {
+  setSensitiveFieldVisible(fieldId, buttonId, label, false);
+}
+
+function initSensitiveFields() {
+  hideSensitiveField("signUrl", "signUrlToggleBtn", "Signing URL");
+  hideSensitiveField("generatedEnvelope", "generatedEnvelopeToggleBtn", "Generated Envelope");
+}
+
+function setJson(id, data) {
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  el.textContent =
+    typeof data === "string"
+      ? data
+      : JSON.stringify(data, null, 2);
+}
+
+function makeProfileId() {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function loadProfilesFromStorage() {
+  try {
+    const raw = localStorage.getItem(PROFILE_STORAGE_KEY) || "[]";
+    const parsed = JSON.parse(raw);
+
+    profiles = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    profiles = [];
+  }
+
+  selectedProfileId = localStorage.getItem(SELECTED_PROFILE_KEY) || "";
+  renderProfiles();
+}
+
+function saveProfilesToStorage() {
+  localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profiles));
+  localStorage.setItem(SELECTED_PROFILE_KEY, selectedProfileId || "");
+}
+
+function renderProfiles() {
+  const select = document.getElementById("profileSelect");
+  if (!select) return;
+
+  select.innerHTML = "";
+
+  if (!profiles.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No profiles saved";
+    select.appendChild(option);
+
+    selectedProfileId = "";
+    setValue("selectedProfileDisplay", "No profile selected");
+    setStatus("secretStatus", "No profiles saved. Create one and tap Save Profile.", true);
+    return;
+  }
+
+  for (const profile of profiles) {
+    const option = document.createElement("option");
+    option.value = profile.id;
+    option.textContent = profile.name || "Unnamed profile";
+    select.appendChild(option);
+  }
+
+  if (!selectedProfileId || !profiles.some((profile) => profile.id === selectedProfileId)) {
+    selectedProfileId = profiles[0].id;
+  }
+
+  select.value = selectedProfileId;
+  loadSelectedProfileIntoFields();
+}
+
+function getSelectedProfile() {
+  return profiles.find((profile) => profile.id === selectedProfileId) || null;
+}
+
+function onProfileSelected() {
+  selectedProfileId = value("profileSelect");
+  localStorage.setItem(SELECTED_PROFILE_KEY, selectedProfileId || "");
+  loadSelectedProfileIntoFields();
+}
+
+function loadSelectedProfileIntoFields() {
+  const profile = getSelectedProfile();
+
+  if (!profile) {
+    setValue("profileName", "");
+    setValue("otpSecret", "");
+    setValue("adminPrivateKey", "");
+    setValue("selectedProfileDisplay", "No profile selected");
+    setStatus("secretStatus", "No profile selected.", true);
+    return;
+  }
+
+  setValue("profileName", profile.name || "");
+  setValue("otpSecret", profile.otpSecret || "");
+  setValue("adminPrivateKey", profile.adminPrivateKey || "");
+  setValue("selectedProfileDisplay", profile.name || "Unnamed profile");
+
+  setStatus("secretStatus", `Selected profile: ${profile.name || "Unnamed profile"}`);
+}
+
+function saveProfile() {
+  const name = value("profileName") || "Unnamed profile";
+  const otpSecret = value("otpSecret");
+  const adminPrivateKey = value("adminPrivateKey");
+
+  if (!otpSecret) {
+    setStatus("secretStatus", "OTP secret is required.", true);
+    return;
+  }
+
+  if (!adminPrivateKey) {
+    setStatus("secretStatus", "Admin private key is required.", true);
+    return;
+  }
+
+  try {
+    base32ToBytes(otpSecret);
+  } catch (err) {
+    setStatus("secretStatus", err.message, true);
+    return;
+  }
+
+  let profile = getSelectedProfile();
+
+  if (!profile) {
+    profile = {
+      id: makeProfileId(),
+      name,
+      otpSecret,
+      adminPrivateKey
+    };
+
+    profiles.push(profile);
+    selectedProfileId = profile.id;
+  } else {
+    profile.name = name;
+    profile.otpSecret = otpSecret;
+    profile.adminPrivateKey = adminPrivateKey;
+  }
+
+  saveProfilesToStorage();
+  renderProfiles();
+
+  setStatus("secretStatus", `Profile saved: ${name}`);
+}
+
+function newProfile() {
+  selectedProfileId = "";
+  localStorage.setItem(SELECTED_PROFILE_KEY, "");
+
+  const select = document.getElementById("profileSelect");
+  if (select) {
+    select.value = "";
+  }
+
+  setValue("profileName", "");
+  setValue("otpSecret", "");
+  setValue("adminPrivateKey", "");
+  setValue("selectedProfileDisplay", "New unsaved profile");
+
+  setStatus("secretStatus", "New profile. Fill it in and tap Save Profile.");
+}
+
+function deleteSelectedProfile() {
+  const profile = getSelectedProfile();
+
+  if (!profile) {
+    setStatus("secretStatus", "No profile selected.", true);
+    return;
+  }
+
+  const ok = confirm(`Delete signer profile "${profile.name || "Unnamed profile"}"?`);
+
+  if (!ok) {
+    return;
+  }
+
+  profiles = profiles.filter((item) => item.id !== profile.id);
+  selectedProfileId = profiles[0]?.id || "";
+
+  saveProfilesToStorage();
+  renderProfiles();
+
+  if (!profiles.length) {
+    newProfile();
+  }
+
+  setStatus("secretStatus", "Profile deleted.");
+}
+
+function getProfileForSigning() {
+  const profile = getSelectedProfile();
+
+  if (!profile) {
+    throw new Error("Select or save a signer profile first.");
+  }
+
+  if (!profile.otpSecret || !profile.adminPrivateKey) {
+    throw new Error("Selected profile is missing OTP secret or admin private key.");
+  }
+
+  return profile;
+}
+
+function parseMaybeJson(raw) {
+  const text = String(raw || "").trim();
+
+  if (!text.startsWith("{")) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function parseOtpSecretQr(raw) {
+  const text = String(raw || "").trim();
+
+  if (!text) {
+    throw new Error("Empty OTP QR.");
+  }
+
+  const parsedJson = parseMaybeJson(text);
+
+  if (parsedJson) {
+    const secret =
+      parsedJson.otpSecret ||
+      parsedJson.otp_secret ||
+      parsedJson.secret ||
+      "";
+
+    if (!secret) {
+      throw new Error("QR JSON does not contain otpSecret.");
+    }
+
+    return String(secret).replace(/\s+/g, "").toUpperCase();
+  }
+
+  if (text.startsWith("otpauth://")) {
+    const url = new URL(text);
+    const secret = String(url.searchParams.get("secret") || "")
+      .replace(/\s+/g, "")
+      .toUpperCase();
+
+    if (!secret) {
+      throw new Error("otpauth QR does not contain secret.");
+    }
+
+    return secret;
+  }
+
+  return text.replace(/\s+/g, "").toUpperCase();
+}
+
+function parseAdminPrivateKeyQr(raw) {
+  const text = String(raw || "").trim();
+
+  if (!text) {
+    throw new Error("Empty admin key QR.");
+  }
+
+  const parsedJson = parseMaybeJson(text);
+
+  if (parsedJson) {
+    const key =
+      parsedJson.adminPrivateKey ||
+      parsedJson.admin_private_key ||
+      parsedJson.privateKey ||
+      parsedJson.private_key ||
+      "";
+
+    if (!key) {
+      throw new Error("QR JSON does not contain adminPrivateKey.");
+    }
+
+    return String(key).trim();
+  }
+
+  return text;
+}
+
+function base32ToBytes(base32) {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  const clean = String(base32 || "")
+    .replace(/=+$/g, "")
+    .replace(/\s+/g, "")
+    .toUpperCase();
+
+  if (!/^[A-Z2-7]+$/.test(clean)) {
+    throw new Error("Invalid OTP secret format");
+  }
+
+  let bits = "";
+
+  for (const char of clean) {
+    const index = alphabet.indexOf(char);
+
+    if (index === -1) {
+      throw new Error("Invalid OTP secret character");
+    }
+
+    bits += index.toString(2).padStart(5, "0");
+  }
+
+  const bytes = [];
+
+  for (let i = 0; i + 8 <= bits.length; i += 8) {
+    bytes.push(parseInt(bits.slice(i, i + 8), 2));
+  }
+
+  return new Uint8Array(bytes);
+}
+
+function bytesToBase64(bytes) {
+  let binary = "";
+  const chunkSize = 0x8000;
+
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+
+  return btoa(binary);
+}
+
+function base64UrlEncodeString(text) {
+  return btoa(text)
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replaceAll("=", "");
+}
+
+async function generateOtpCode(otpSecret, timeMs = Date.now()) {
+  const keyBytes = base32ToBytes(otpSecret);
+  const counter = Math.floor(timeMs / 1000 / 30);
+
+  const counterBytes = new Uint8Array(8);
+  const view = new DataView(counterBytes.buffer);
+
+  view.setBigUint64(0, BigInt(counter), false);
+
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    keyBytes,
+    {
+      name: "HMAC",
+      hash: "SHA-256"
+    },
+    false,
+    ["sign"]
+  );
+
+  const signature = new Uint8Array(
+    await crypto.subtle.sign("HMAC", cryptoKey, counterBytes)
+  );
+
+  let value = 0n;
+
+  for (const byte of signature) {
+    value = (value << 8n) + BigInt(byte);
+  }
+
+  const modulo = 10n ** BigInt(OTP_CODE_DIGITS);
+  const otp = value % modulo;
+
+  return otp.toString().padStart(OTP_CODE_DIGITS, "0");
+}
+
+async function encryptAdminPrivateKeyWithOtp(adminPrivateKey, otpCode) {
+  const cleanPrivateKey = String(adminPrivateKey || "").trim();
+  const cleanOtpCode = String(otpCode || "").trim();
+
+  if (!cleanPrivateKey) {
+    throw new Error("Missing admin private key");
+  }
+
+  if (!/^[0-9]{24}$/.test(cleanOtpCode)) {
+    throw new Error("OTP code must be 24 digits");
+  }
+
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encoder = new TextEncoder();
+
+  const passwordMaterial = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(`otp-admin-envelope-v1:${cleanOtpCode}`),
+    "PBKDF2",
+    false,
+    ["deriveKey"]
+  );
+
+  const aesKey = await crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt,
+      iterations: ADMIN_ENVELOPE_ITERATIONS,
+      hash: "SHA-256"
+    },
+    passwordMaterial,
+    {
+      name: "AES-GCM",
+      length: 256
+    },
+    false,
+    ["encrypt"]
+  );
+
+  const encrypted = new Uint8Array(
+    await crypto.subtle.encrypt(
+      {
+        name: "AES-GCM",
+        iv,
+        tagLength: 128
+      },
+      aesKey,
+      encoder.encode(cleanPrivateKey)
+    )
+  );
+
+  const authTag = encrypted.slice(encrypted.length - 16);
+  const ciphertext = encrypted.slice(0, encrypted.length - 16);
+
+  const envelope = {
+    v: 1,
+    type: "otp-encrypted-admin-private-key",
+    alg: "aes-256-gcm",
+    kdf: "pbkdf2-sha256",
+    iterations: ADMIN_ENVELOPE_ITERATIONS,
+    salt: bytesToBase64(salt),
+    iv: bytesToBase64(iv),
+    authTag: bytesToBase64(authTag),
+    ciphertext: bytesToBase64(ciphertext)
+  };
+
+  return `${ADMIN_ENVELOPE_PREFIX}${base64UrlEncodeString(JSON.stringify(envelope))}`;
+}
+
+async function generateEnvelopeFromSelectedProfile() {
+  const profile = getProfileForSigning();
+  const otpCode = await generateOtpCode(profile.otpSecret);
+
+  if (loadedRequest && loadedRequest.mode === "hotpocket-login") {
+    const loginRequest = loadedRequest.loginRequest;
+
+    const payload = {
+      type: "everstoring-admin-login-v1",
+      adminPrivateKey: profile.adminPrivateKey,
+      devicePublicKey: loginRequest.devicePublicKey,
+      nonce: loginRequest.nonce,
+      createdAtMs: Date.now()
+    };
+
+    return encryptAdminPrivateKeyWithOtp(
+      JSON.stringify(payload),
+      otpCode
+    );
+  }
+
+  return encryptAdminPrivateKeyWithOtp(
+    profile.adminPrivateKey,
+    otpCode
+  );
+}
+
+async function handleScannedQr(rawValue) {
+  stopScanner(false);
+
+  if (scannerTarget === "otp") {
+    try {
+      const otpSecret = parseOtpSecretQr(rawValue);
+      base32ToBytes(otpSecret);
+
+      setValue("otpSecret", otpSecret);
+      setStatus("secretStatus", "OTP secret imported from QR. Save the profile when ready.");
+      setStatus("scanStatus", "OTP secret QR scanned.");
+    } catch (err) {
+      setStatus("secretStatus", err.message, true);
+      setStatus("scanStatus", err.message, true);
+    }
+
+    return;
+  }
+
+  if (scannerTarget === "adminKey") {
+    try {
+      const adminPrivateKey = parseAdminPrivateKeyQr(rawValue);
+
+      setValue("adminPrivateKey", adminPrivateKey);
+      setStatus("secretStatus", "Admin private key imported from QR. Save the profile when ready.");
+      setStatus("scanStatus", "Admin private key QR scanned.");
+    } catch (err) {
+      setStatus("secretStatus", err.message, true);
+      setStatus("scanStatus", err.message, true);
+    }
+
+    return;
+  }
+
+const hpLogin = parseHpLoginFromValue(rawValue);
+
+if (hpLogin) {
+  loadHotPocketLoginRequest(hpLogin);
+  return;
+}
+
+setValue("signUrl", rawValue);
+hideSensitiveField("signUrl", "signUrlToggleBtn", "Signing URL");
+setStatus("scanStatus", "Sign request QR scanned. Loading request...");
+await loadRequest();
+}
+
+function createScannerVideo() {
+  const scannerFrame = document.getElementById("scannerFrame");
+
+  if (!scannerFrame) {
+    throw new Error("Scanner frame missing.");
+  }
+
+  scannerFrame.innerHTML = "";
+
+  const video = document.createElement("video");
+
+  video.id = "scannerVideo";
+  video.autoplay = true;
+  video.muted = true;
+  video.playsInline = true;
+
+  video.setAttribute("autoplay", "");
+  video.setAttribute("muted", "");
+  video.setAttribute("playsinline", "");
+  video.setAttribute("webkit-playsinline", "");
+
+  video.style.width = "100%";
+  video.style.height = "100%";
+  video.style.objectFit = "cover";
+  video.style.background = "black";
+  video.style.display = "block";
+
+  scannerFrame.appendChild(video);
+
+  return video;
+}
+
+async function startScanner(target = "signUrl") {
+  scannerTarget = target;
+
+  stopScanner(false);
+
+  const scannerWrap = document.getElementById("scannerWrap");
+  const scannerLabel = document.getElementById("scannerLabel");
+
+  const label = {
+    otp: "Camera active — scan OTP secret QR",
+    adminKey: "Camera active — scan admin private key QR",
+    signUrl: "Camera active — scan sign request QR"
+  }[scannerTarget] || "Camera active — scan QR code";
+
+  try {
+    if (!window.isSecureContext) {
+      throw new Error("Camera requires HTTPS / secure context.");
+    }
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error("Camera API is not available in this PWA/browser.");
+    }
+
+    if (scannerLabel) {
+      scannerLabel.textContent = label;
+    }
+
+    document.body.classList.add("scanner-open");
+
+    if (scannerWrap) {
+      scannerWrap.classList.add("active");
+    }
+
+    const video = createScannerVideo();
+
+    setScannerOverlayStatus("Requesting camera permission...", false);
+    setStatus("scanStatus", "Requesting camera permission...");
+    setStatus("secretStatus", "Requesting camera permission...");
+
+    try {
+      scannerStream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
+    } catch {
+      setScannerOverlayStatus("Camera constraints failed. Retrying with basic camera mode...", false);
+
+      scannerStream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: true
+      });
+    }
+
+video.srcObject = scannerStream;
+
+await new Promise((resolve) => {
+  if (video.readyState >= 1) {
+    resolve();
+    return;
+  }
+
+  video.onloadedmetadata = () => resolve();
+});
+
+try {
+  await video.play();
+} catch (err) {
+  throw new Error(
+    "Camera opened, but video playback failed. On iPhone, try closing and reopening the Home Screen app, or use Take QR Photo."
+  );
+}
+
+    setScannerOverlayStatus("Camera stream started. Waiting for video frames...", false);
+    setStatus("scanStatus", label);
+    setStatus("secretStatus", label);
+
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d", {
+      willReadFrequently: true
+    });
+
+    scannerTimer = setInterval(async () => {
+      try {
+        if (!video.videoWidth || !video.videoHeight) {
+          setScannerOverlayStatus(
+            "Camera stream opened, but no video frames are visible yet.\n\n" +
+            "If this stays stuck in iOS PWA mode, use Take QR Photo or open /signer/?web=1 in Safari.",
+            false
+          );
+          return;
+        }
+
+        setScannerOverlayStatus("Camera ready. Point at QR code.", false);
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const imageData = context.getImageData(
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+
+        const result = jsQR(
+          imageData.data,
+          imageData.width,
+          imageData.height,
+          {
+            inversionAttempts: "attemptBoth"
+          }
+        );
+
+        if (!result || !result.data) {
+          return;
+        }
+
+        await handleScannedQr(result.data);
+      } catch (err) {
+        console.warn("QR frame decode failed:", err);
+      }
+    }, 350);
+  } catch (err) {
+    const message = cameraErrorMessage(err);
+
+    if (scannerWrap) {
+      scannerWrap.classList.add("active");
+    }
+
+    document.body.classList.add("scanner-open");
+
+    setScannerOverlayStatus(message, true);
+    setStatus("scanStatus", message, true);
+    setStatus("secretStatus", message, true);
+  }
+}
+function cameraErrorMessage(err) {
+  const name = err && err.name ? err.name : "";
+
+  if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+    return [
+      "Camera permission was denied.",
+      "",
+      "Fix on iPhone:",
+      "1. Open Settings",
+      "2. Find Safari or the Home Screen app settings",
+      "3. Allow Camera",
+      "4. Fully close EV Signer and reopen it",
+      "",
+      "If it still fails, open the exact URL in Safari:",
+      "https://your-domain.com/signer/"
+    ].join("\n");
+  }
+
+  if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+    return "No camera was found on this device.";
+  }
+
+  if (name === "NotReadableError" || name === "TrackStartError") {
+    return "The camera exists, but another app/browser tab may already be using it.";
+  }
+
+  if (name === "OverconstrainedError") {
+    return "The requested rear-camera constraints failed. Retrying with basic camera mode should fix this.";
+  }
+
+  return errorDetails(err);
+}
+function stopScanner(clearStatus = true) {
+  if (scannerTimer) {
+    clearInterval(scannerTimer);
+    scannerTimer = null;
+  }
+
+  if (scannerStream) {
+    scannerStream.getTracks().forEach((track) => track.stop());
+    scannerStream = null;
+  }
+
+  const video = document.getElementById("scannerVideo");
+
+  if (video) {
+    video.pause();
+    video.srcObject = null;
+  }
+
+  const scannerFrame = document.getElementById("scannerFrame");
+
+  if (scannerFrame) {
+    scannerFrame.innerHTML = "";
+  }
+
+  const scannerWrap = document.getElementById("scannerWrap");
+
+  if (scannerWrap) {
+    scannerWrap.classList.remove("active");
+  }
+
+  document.body.classList.remove("scanner-open");
+  setScannerOverlayStatus("");
+
+  if (clearStatus) {
+    setStatus("scanStatus", "Camera stopped.");
+  }
+}
+
+function scanQrFromPhoto(target = scannerTarget || "signUrl") {
+  scannerTarget = target;
+
+  const input = document.getElementById("qrImageInput");
+
+  if (!input) {
+    setStatus("scanStatus", "QR image input missing.", true);
+    return;
+  }
+
+  input.value = "";
+  input.click();
+}
+
+async function decodeQrWithNativeDetector(file) {
+  if (!("BarcodeDetector" in window)) {
+    return "";
+  }
+
+  try {
+    const detector = new BarcodeDetector({
+      formats: ["qr_code"]
+    });
+
+    const bitmap = await createImageBitmap(file);
+    const codes = await detector.detect(bitmap);
+
+    if (codes && codes.length && codes[0].rawValue) {
+      return codes[0].rawValue;
+    }
+  } catch (err) {
+    console.warn("BarcodeDetector failed:", err);
+  }
+
+  return "";
+}
+
+async function decodeQrImageFile(file) {
+  if (!file) {
+    throw new Error("No image selected.");
+  }
+
+  const nativeResult = await decodeQrWithNativeDetector(file);
+
+  if (nativeResult) {
+    return nativeResult;
+  }
+
+  const imageUrl = URL.createObjectURL(file);
+
+  try {
+    const img = new Image();
+
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = () => reject(new Error("Could not load QR image."));
+      img.src = imageUrl;
+    });
+
+    const originalWidth = img.naturalWidth || img.width;
+    const originalHeight = img.naturalHeight || img.height;
+
+    if (!originalWidth || !originalHeight) {
+      throw new Error("Invalid QR image.");
+    }
+
+    const attempts = [2600, 2200, 1800, 1400, 1000, 700];
+
+    for (const maxSize of attempts) {
+      const scale = Math.min(1, maxSize / Math.max(originalWidth, originalHeight));
+      const width = Math.max(1, Math.floor(originalWidth * scale));
+      const height = Math.max(1, Math.floor(originalHeight * scale));
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+
+      const context = canvas.getContext("2d", {
+        willReadFrequently: true
+      });
+
+      context.imageSmoothingEnabled = false;
+      context.drawImage(img, 0, 0, width, height);
+
+      const imageData = context.getImageData(0, 0, width, height);
+
+      let result = jsQR(
+        imageData.data,
+        imageData.width,
+        imageData.height,
+        {
+          inversionAttempts: "attemptBoth"
+        }
+      );
+
+      if (result && result.data) {
+        return result.data;
+      }
+
+      const data = imageData.data;
+
+      for (let i = 0; i < data.length; i += 4) {
+        const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+        const bw = avg > 128 ? 255 : 0;
+
+        data[i] = bw;
+        data[i + 1] = bw;
+        data[i + 2] = bw;
+      }
+
+      result = jsQR(
+        imageData.data,
+        imageData.width,
+        imageData.height,
+        {
+          inversionAttempts: "attemptBoth"
+        }
+      );
+
+      if (result && result.data) {
+        return result.data;
+      }
+    }
+
+    throw new Error(
+      "No QR code found in image. Try screenshotting the QR, crop it so the QR fills most of the image, then choose that screenshot."
+    );
+  } finally {
+    URL.revokeObjectURL(imageUrl);
+  }
+}
+
+function clearRequest() {
+  loadedRequest = null;
+
+  setValue("signUrl", "");
+  setValue("generatedEnvelope", "");
+  hideSensitiveField("signUrl", "signUrlToggleBtn", "Signing URL");
+  hideSensitiveField("generatedEnvelope", "generatedEnvelopeToggleBtn", "Generated Envelope");
+  setJson("requestDetails", "No request loaded yet.");
+  setJson("remoteResponse", "No response yet.");
+
+  setStatus("scanStatus", "Request cleared.");
+  setStatus("signStatus", "");
+}
+
+function assertUrl(rawValue) {
+  const raw = String(rawValue || "").trim();
+
+  if (!raw) {
+    throw new Error("Signing URL is required.");
+  }
+
+  let parsed;
+
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error("Invalid signing URL.");
+  }
+
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    throw new Error("Signing URL must be http or https.");
+  }
+
+  return parsed.toString();
+}
+
+async function loadRequest() {
+  try {
+    const signUrl = assertUrl(value("signUrl"));
+
+    setStatus("scanStatus", "Loading sign request...");
+
+    const response = await fetch(signUrl, {
+      method: "GET",
+      cache: "no-store",
+      headers: {
+        "Accept": "application/json"
+      }
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok || data.ok === false) {
+      throw new Error(data.error || `HTTP ${response.status}`);
+    }
+
+    loadedRequest = data;
+    setJson("requestDetails", data);
+    setStatus("scanStatus", "Request loaded. Review before signing.");
+  } catch (err) {
+    loadedRequest = null;
+    setJson("requestDetails", "No request loaded.");
+    setStatus("scanStatus", err.message, true);
+  }
+}
+
+function getSubmitUrl() {
+  if (!loadedRequest) {
+    throw new Error("No request loaded.");
+  }
+
+  return assertUrl(
+    loadedRequest.submitUrl ||
+    loadedRequest.signUrl ||
+    value("signUrl")
+  );
+}
+
+async function submitHotPocketLoginAuthorization(envelope) {
+  if (!loadedRequest || loadedRequest.mode !== "hotpocket-login") {
+    throw new Error("No HotPocket login request loaded.");
+  }
+
+  if (!window.HotPocket || !window.HotPocket.createClient) {
+    throw new Error("hotpocket-js-client.min.js is not loaded.");
+  }
+
+  if (window.sodium?.ready) {
+    await window.sodium.ready;
+  }
+
+  const BSON = getBsonLib();
+  const loginRequest = loadedRequest.loginRequest;
+  const endpoint = String(loginRequest.endpoint || "").trim();
+
+  if (!endpoint) {
+    throw new Error("HotPocket login request is missing endpoint.");
+  }
+
+  const signerKeypair = await window.HotPocket.generateKeys();
+
+  const client = await window.HotPocket.createClient(
+    [endpoint],
+    signerKeypair,
+    {
+      protocol: window.HotPocket.protocols.bson,
+      requiredConnectionCount: 1,
+      connectionTimeoutMs: 10000
+    }
+  );
+
+  const actionId = makeActionId();
+
+  const waitForOutput = new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("Timed out waiting for HotPocket authorization response."));
+    }, 45000);
+
+    client.on(window.HotPocket.events.contractOutput, (result) => {
+      for (const raw of result.outputs || []) {
+        let output;
+
+        try {
+          const normalized = normalizeHpOutput(raw);
+          output = normalized && normalized.type
+            ? normalized
+            : BSON.deserialize(normalized);
+        } catch {
+          continue;
+        }
+
+        if (output.actionId !== actionId) {
+          continue;
+        }
+
+        clearTimeout(timeout);
+
+        if (output.type === "error") {
+          reject(new Error(output.error || "Contract returned an error."));
+        } else {
+          resolve(output);
+        }
+      }
+    });
+  });
+
+  const connected = await client.connect();
+
+  if (!connected) {
+    throw new Error("Could not connect to HotPocket endpoint.");
+  }
+
+  const message = {
+    type: "authorize-device",
+    actionId,
+    devicePublicKey: loginRequest.devicePublicKey,
+    nonce: loginRequest.nonce,
+    adminEnvelope: envelope,
+    ttlSeconds: Number(loginRequest.ttlSeconds || 86400)
+  };
+
+  const submission = await client.submitContractInput(BSON.serialize(message));
+  const status = await submission.submissionStatus;
+
+  if (status.status !== "accepted") {
+    try { client.close(); } catch {}
+    throw new Error(`Contract input rejected: ${JSON.stringify(status)}`);
+  }
+
+  try {
+    const output = await waitForOutput;
+    try { client.close(); } catch {}
+    return output;
+  } catch (err) {
+    try { client.close(); } catch {}
+    throw err;
+  }
+}
+
+async function signAndSend() {
+  try {
+    if (!loadedRequest) {
+      throw new Error("Load a sign request first.");
+    }
+
+    const profile = getProfileForSigning();
+
+    const ok = confirm(
+      "Sign this remote request?\n\n" +
+      "Profile: " + (profile.name || "Unnamed profile") + "\n" +
+      "App: " + (loadedRequest.appName || "unknown") + "\n" +
+      "Action: " + (loadedRequest.actionName || "unknown")
+    );
+
+    if (!ok) {
+      setStatus("signStatus", "Signing cancelled.");
+      return;
+    }
+
+    setStatus("signStatus", "Generating fresh evadmin:v1 envelope...");
+
+    const envelope = await generateEnvelopeFromSelectedProfile();
+    setValue("generatedEnvelope", envelope);
+    hideSensitiveField("generatedEnvelope", "generatedEnvelopeToggleBtn", "Generated Envelope");
+
+    if (loadedRequest.mode === "hotpocket-login") {
+      setStatus("signStatus", "Submitting authorization directly to HotPocket...");
+
+      const result = await submitHotPocketLoginAuthorization(envelope);
+
+      setJson("remoteResponse", result);
+      setStatus("signStatus", "Signed and authorized. The generated envelope is hidden unless you choose to show it. Return to the upload page.");
+      return;
+    }
+
+    const submitUrl = getSubmitUrl();
+
+    setStatus("signStatus", "Sending envelope...");
+
+    const response = await fetch(submitUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-key-envelope": envelope
+      },
+      body: JSON.stringify({
+        requestId: loadedRequest.requestId || loadedRequest.id || null,
+        adminEnvelope: envelope,
+        envelopeType: "evadmin:v1",
+        signedAt: new Date().toISOString()
+      })
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok || data.ok === false) {
+      throw new Error(data.error || `HTTP ${response.status}`);
+    }
+
+    setJson("remoteResponse", data);
+    setStatus("signStatus", "Signed and sent. The generated envelope is hidden unless you choose to show it.");
+  } catch (err) {
+    setStatus("signStatus", err.message, true);
+  }
+}
+
+async function generateEnvelopeOnly() {
+  try {
+    setStatus("signStatus", "Generating fresh evadmin:v1 envelope...");
+
+    const envelope = await generateEnvelopeFromSelectedProfile();
+
+    setValue("generatedEnvelope", envelope);
+    hideSensitiveField("generatedEnvelope", "generatedEnvelopeToggleBtn", "Generated Envelope");
+    setStatus("signStatus", "Envelope generated and hidden. Tap Show Generated Envelope only when you need to view it.");
+  } catch (err) {
+    setStatus("signStatus", err.message, true);
+  }
+}
+
+async function copyEnvelope() {
+  try {
+    const envelope = value("generatedEnvelope");
+
+    if (!envelope) {
+      throw new Error("No envelope to copy.");
+    }
+
+    await navigator.clipboard.writeText(envelope);
+    setStatus("signStatus", "Envelope copied.");
+  } catch (err) {
+    const el = document.getElementById("generatedEnvelope");
+
+    if (el) {
+      el.focus();
+      el.select();
+      document.execCommand("copy");
+      setStatus("signStatus", "Envelope selected. Copy it manually if needed.");
+      return;
+    }
+
+    setStatus("signStatus", err.message, true);
+  }
+}
+
+function updateOnlineStatus() {
+  const mode = isStandalonePwa()
+    ? "Installed app mode."
+    : "App preview mode.";
+
+  if (navigator.onLine) {
+    setStatus(
+      "onlineStatus",
+      `${mode} Online. The app can load and submit signing requests.`
+    );
+  } else {
+    setStatus(
+      "onlineStatus",
+      `${mode} Offline. The signer app can still open, but loading/submitting signing requests needs network.`,
+      true
+    );
+  }
+}
+
+async function waitForExactServiceWorker(registration) {
+  if (registration.active) return registration;
+
+  const worker = registration.installing || registration.waiting;
+  if (!worker) return registration;
+
+  await new Promise((resolve, reject) => {
+    const done = () => {
+      if (worker.state === "activated") resolve();
+      else if (worker.state === "redundant") reject(new Error("Signer service worker install became redundant."));
+    };
+    worker.addEventListener("statechange", done);
+    done();
+  });
+
+  return registration;
+}
+
+async function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) {
+    setStatus("cacheStatus", "Service worker not supported in this browser.", true);
+    setInstallerStatus("Service worker not supported in this browser.", true);
+    return null;
+  }
+
+  try {
+    const signerScope = new URL("./", location.href).href;
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    let registration = registrations.find((item) => item.scope === signerScope) || null;
+
+    // Register only when the signer has no exact-scope worker yet. We deliberately do not
+    // call update() on later launches: the installed local snapshot stays the default.
+    if (!registration) {
+      registration = await navigator.serviceWorker.register("./sw.js", {
+        scope: "./",
+        updateViaCache: "all"
+      });
+    }
+
+    if (registration.waiting) {
+      registration.waiting.postMessage({ type: "SKIP_WAITING" });
+    }
+
+    await waitForExactServiceWorker(registration);
+    setStatus("cacheStatus", "Local signer snapshot is installed. App-shell loads are cache-only.");
+    return registration;
+  } catch (err) {
+    setStatus("cacheStatus", `Service worker failed: ${err.message}`, true);
+    setInstallerStatus(`Local snapshot failed: ${err.message}`, true);
+    return null;
+  }
+}
+
+async function verifyAppShellCache() {
+  if (!("caches" in window)) return false;
+
+  try {
+    const cacheNames = await caches.keys();
+    if (!cacheNames.includes(SIGNER_CACHE_NAME)) {
+      setStatus("cacheStatus", "Local signer snapshot is not ready yet.", true);
+      setInstallerStatus("Local signer snapshot is not ready yet. Reload while this host is reachable.", true);
+      return false;
+    }
+
+    const cache = await caches.open(SIGNER_CACHE_NAME);
+    const required = [
+      "./",
+      "./index.html",
+      "./manifest.json",
+      "./sw.js",
+      "./jsQR.js",
+      "./sodium.js",
+      "./bson.bundle.min.js",
+      "./hotpocket-js-client.min.js",
+      "./icon.png",
+      "./icon.svg",
+      "./signer_terms.md"
+    ].map((path) => new URL(path, location.href).toString());
+
+    const missing = [];
+    for (const path of required) {
+      const hit = await cache.match(path, { ignoreSearch: true });
+      if (!hit) missing.push(path);
+    }
+
+    if (missing.length) {
+      const message = "Local signer snapshot is incomplete:\n" + missing.join("\n");
+      setStatus("cacheStatus", message, true);
+      setInstallerStatus(message, true);
+      return false;
+    }
+
+    setStatus("cacheStatus", "Local signer snapshot ready — signer UI/assets will not use a website fallback.");
+    setInstallerStatus("Local snapshot ready. You can install EV Signer now.");
+    return true;
+  } catch (err) {
+    setStatus("cacheStatus", `Cache check failed: ${err.message}`, true);
+    setInstallerStatus(`Cache check failed: ${err.message}`, true);
+    return false;
+  }
+}
+
+async function installSignerPwa() {
+  const ready = await verifyAppShellCache();
+  if (!ready) return;
+
+  if (isStandalonePwa()) {
+    setInstallerStatus("EV Signer is already running as an installed app.");
+    return;
+  }
+
+  if (deferredInstallPrompt) {
+    const prompt = deferredInstallPrompt;
+    deferredInstallPrompt = null;
+    await prompt.prompt();
+    const choice = await prompt.userChoice;
+    if (choice && choice.outcome === "accepted") {
+      setInstallerStatus("Install accepted. Open EV Signer from your app/Home Screen.");
+    } else {
+      setInstallerStatus("Install prompt dismissed. Your local signer snapshot is still preserved.");
+    }
+    return;
+  }
+
+  const isiOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  if (isiOS) {
+    setInstallerStatus("Local snapshot ready. On iPhone/iPad: Share → Add to Home Screen → Add.");
+  } else {
+    setInstallerStatus("Local snapshot ready. Use the browser menu → Install App / Add to Home Screen if no native prompt appears.");
+  }
+}
+
+async function initQrPhotoInput() {
+  const qrImageInput = document.getElementById("qrImageInput");
+
+  if (!qrImageInput) {
+    return;
+  }
+
+  qrImageInput.addEventListener("change", async function () {
+    try {
+      const file = this.files && this.files[0];
+
+      setScannerOverlayStatus("Reading QR image...", false);
+      setStatus("scanStatus", "Reading QR image...");
+
+      const qrValue = await decodeQrImageFile(file);
+
+      await handleScannedQr(qrValue);
+    } catch (err) {
+      const message =
+        errorDetails(err) +
+        "\n\nTips:\n" +
+        "- Use a screenshot of the QR if possible\n" +
+        "- Crop so the QR fills most of the image\n" +
+        "- Avoid glare and blur\n" +
+        "- Keep the QR square, not angled";
+
+      setScannerOverlayStatus(message, true);
+      setStatus("scanStatus", message, true);
+      setStatus("secretStatus", message, true);
+    }
+  });
+}
+
+async function init() {
+  try {
+    const params = new URLSearchParams(location.search);
+    const installRequested = params.get("install") === "1" && !isStandalonePwa();
+
+    setVisible("installerView", installRequested);
+    setVisible("appView", !installRequested);
+
+    updateOnlineStatus();
+    initSensitiveFields();
+    await initQrPhotoInput();
+    await initTermsModal();
+    loadProfilesFromStorage();
+
+    const hpLoginParam = params.get("hpLogin");
+
+    if (hpLoginParam) {
+      const hpLogin = parseHpLoginFromValue(hpLoginParam);
+
+      if (!hpLogin) {
+        setStatus("scanStatus", "Invalid hpLogin parameter.", true);
+      } else {
+        loadHotPocketLoginRequest(hpLogin);
+      }
+    } else {
+      const signUrl = params.get("signUrl");
+
+      if (signUrl) {
+        const hpLogin = parseHpLoginFromValue(signUrl);
+
+        if (hpLogin) {
+          loadHotPocketLoginRequest(hpLogin);
+        } else {
+          setValue("signUrl", signUrl);
+          hideSensitiveField("signUrl", "signUrlToggleBtn", "Signing URL");
+          await loadRequest();
+        }
+      }
+    }
+
+    // Cache setup must not be allowed to blank the app.
+    registerServiceWorker()
+      .then(() => verifyAppShellCache())
+      .then(() => renderTermsContent())
+      .catch((err) => {
+        const message = `Offline cache setup failed:\n${errorDetails(err)}`;
+        setStatus("cacheStatus", message, true);
+        setInstallerStatus(message, true);
+      });
+  } catch (err) {
+    // Never leave both views hidden.
+    setVisible("installerView", false);
+    setVisible("appView", true);
+
+    setStatus(
+      "cacheStatus",
+      `Startup failed:\n${errorDetails(err)}`,
+      true
+    );
+  }
+}
+
+init();
+</script>
+</body>
+</html>

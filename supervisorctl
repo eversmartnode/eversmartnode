@@ -1,0 +1,14 @@
+#!/bin/bash
+set -euo pipefail
+CONF="${EVERSMARTNODE_SUPERVISOR_CONF:-/etc/eversmartnode/supervisord.conf}"
+case "${1:-status}" in
+  status) exec /usr/bin/supervisorctl -c "$CONF" status eversmartnode hotpocket ;;
+  restart) exec /usr/bin/supervisorctl -c "$CONF" restart eversmartnode ;;
+  restart-hotpocket) exec /usr/bin/supervisorctl -c "$CONF" restart hotpocket ;;
+  logs) exec /usr/bin/supervisorctl -c "$CONF" tail -f eversmartnode stdout ;;
+  errors) exec /usr/bin/supervisorctl -c "$CONF" tail -f eversmartnode stderr ;;
+  *)
+    echo "Usage: eversmartnode-supervisorctl {status|restart|restart-hotpocket|logs|errors}" >&2
+    exit 2
+    ;;
+esac

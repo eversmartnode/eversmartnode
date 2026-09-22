@@ -1,0 +1,25 @@
+{
+  "id": "./",
+  "name": "Everstoring Remote Signer",
+  "short_name": "EV Signer",
+  "description": "Remote signer for EverAdmin / Everstoring signing requests",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f1115",
+  "theme_color": "#0f1115",
+  "icons": [
+    {
+      "src": "./icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

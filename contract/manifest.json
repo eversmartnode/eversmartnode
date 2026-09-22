@@ -1,0 +1,9 @@
+{
+  "name": "EverSmartNode",
+  "short_name": "EverSmartNode",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#07101e",
+  "theme_color": "#07101e",
+  "icons": []
+}

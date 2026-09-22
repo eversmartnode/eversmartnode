@@ -1,0 +1,224 @@
+{
+  "schema": 1,
+  "product": "everadmin-control-plane",
+  "version": "1.7.0-alpha.53.95-purity-fence-handover",
+  "minimumUpgradeFrom": "1.6.19",
+  "entryFile": "sidedish.js",
+  "layout": "flat-state-root",
+  "webFiles": [
+    "evernode-logo.svg",
+    "evernode.html",
+    "hotpocket-js-client.min.js",
+    "index.html",
+    "manifest.json",
+    "qrcode.js",
+    "service-worker.js",
+    "setup/hotpocket-js-client.min.js",
+    "setup/icon.svg",
+    "setup/index.html",
+    "setup/manifest.json",
+    "setup/qrcode.js",
+    "setup/sodium.js",
+    "setup/sw.js",
+    "setup/terms.md",
+    "signer/bson.bundle.min.js",
+    "signer/hotpocket-js-client.min.js",
+    "signer/icon.png",
+    "signer/icon.svg",
+    "signer/index.html",
+    "signer/jsQR.js",
+    "signer/manifest.json",
+    "signer/signer_terms.md",
+    "signer/sodium.js",
+    "signer/sw.js",
+    "sodium.js"
+  ],
+  "files": [
+    {
+      "path": "COPYING",
+      "role": "metadata",
+      "sha256": "1f0954d47d36bb76741271c6bc267a8c3ed6ca4ff7606cd7e8cedc30ae04ac34",
+      "size": 18099
+    },
+    {
+      "path": "cluster-controller.js",
+      "role": "contract",
+      "sha256": "0f728ef6bb038a5f14aa7a4f79ac637c7cfc65d8ab8082aa42685fcd5d965483",
+      "size": 661347
+    },
+    {
+      "path": "contract.deploy.json",
+      "role": "metadata",
+      "sha256": "754fe52733c7538d547e1bfe886c06348066e5644fdba8e7da4c46b19a16ef53",
+      "size": 124
+    },
+    {
+      "path": "evernode-logo.svg",
+      "role": "metadata",
+      "sha256": "ae18dff78c0a6592e10317e3855f481e019472916ca4ca7c035c677ef85031e4",
+      "size": 1002
+    },
+    {
+      "path": "evernode.html",
+      "role": "metadata",
+      "sha256": "1da7932988a83374b7ebe94d34d397b7626ea68d23698b5e781ebd3cdade9069",
+      "size": 206479
+    },
+    {
+      "path": "hotpocket-js-client.min.js",
+      "role": "metadata",
+      "sha256": "461711cb54a928229efff99165b1b309b440c97254c10e5b2757a087da137677",
+      "size": 137609
+    },
+    {
+      "path": "index.html",
+      "role": "metadata",
+      "sha256": "e20da6c7f724d8898480525693f9eaecd179d336f55e022ded1beefb77341b06",
+      "size": 123225
+    },
+    {
+      "path": "index.js",
+      "role": "protected",
+      "sha256": "27f996b2b747031fa175510c96744144b5ccc54b7e8e0a68e494bcd705531fcf",
+      "size": 188450
+    },
+    {
+      "path": "manifest.json",
+      "role": "metadata",
+      "sha256": "38f45e57f411c634c52e7f923d393576aa1b2fc56107240fa83127293563a756",
+      "size": 197
+    },
+    {
+      "path": "qrcode.js",
+      "role": "metadata",
+      "sha256": "79ec86f82856005b1c887905cfccfcfbec3821ca61c7fd5a952faa5f778f791c",
+      "size": 56694
+    },
+    {
+      "path": "service-worker.js",
+      "role": "metadata",
+      "sha256": "8f8b4c79b2108076b41e7316b32e59b138a895f7ae706b70bc86e4c9060749ea",
+      "size": 874
+    },
+    {
+      "path": "setup/hotpocket-js-client.min.js",
+      "role": "metadata",
+      "sha256": "7e7c01cc7b3c49376bf64ed37b79d764c8ac6d31bd53afef4a7fa23a60207e1a",
+      "size": 137595
+    },
+    {
+      "path": "setup/icon.svg",
+      "role": "metadata",
+      "sha256": "1dd05be106f7fedbdee5f4cf0d387b23d9e0443cf31dd50416b2e0f7a2008f02",
+      "size": 309
+    },
+    {
+      "path": "setup/index.html",
+      "role": "metadata",
+      "sha256": "57e19035d6955d509fe34665ff47b0195861c359c041bafab403463777c3b7e8",
+      "size": 23540
+    },
+    {
+      "path": "setup/manifest.json",
+      "role": "metadata",
+      "sha256": "7c2bfb912b7ab1540a3bf8bbaf540b8abe0a8e9e360aaf2c26f8c31d3e0f01bf",
+      "size": 459
+    },
+    {
+      "path": "setup/qrcode.js",
+      "role": "metadata",
+      "sha256": "79ec86f82856005b1c887905cfccfcfbec3821ca61c7fd5a952faa5f778f791c",
+      "size": 56694
+    },
+    {
+      "path": "setup/sodium.js",
+      "role": "metadata",
+      "sha256": "bb3998dc428b19ba43b08320962ceea48afcffda923760949612f7ed6c4db800",
+      "size": 740647
+    },
+    {
+      "path": "setup/sw.js",
+      "role": "metadata",
+      "sha256": "3d7830b07c9fa32a37c6d6928f65835fc8c37473339c264caf60e95813f0832a",
+      "size": 988
+    },
+    {
+      "path": "setup/terms.md",
+      "role": "metadata",
+      "sha256": "61394b6af312b3279710f83ec7944c910f385aef0a8ed79f29173c5105c87af0",
+      "size": 1293
+    },
+    {
+      "path": "sidedish.js",
+      "role": "contract",
+      "sha256": "409654fc9d91280923fe43867d4a49dd11874653a45757b532c774c77163df22",
+      "size": 182520
+    },
+    {
+      "path": "signer/bson.bundle.min.js",
+      "role": "metadata",
+      "sha256": "187a444be97cd49a1918fe11b05dacb16965e9ffaa8eb8239fa79027a0ad0e45",
+      "size": 69147
+    },
+    {
+      "path": "signer/hotpocket-js-client.min.js",
+      "role": "metadata",
+      "sha256": "461711cb54a928229efff99165b1b309b440c97254c10e5b2757a087da137677",
+      "size": 137609
+    },
+    {
+      "path": "signer/icon.png",
+      "role": "metadata",
+      "sha256": "c73988242595bf01463bde59963753aa7116bfcede2c33dbb403343e371994af",
+      "size": 8392
+    },
+    {
+      "path": "signer/icon.svg",
+      "role": "metadata",
+      "sha256": "1dd05be106f7fedbdee5f4cf0d387b23d9e0443cf31dd50416b2e0f7a2008f02",
+      "size": 309
+    },
+    {
+      "path": "signer/index.html",
+      "role": "metadata",
+      "sha256": "93aa0be66ad0d0c8a46aebaab0318f69ec7b726712f29e10d6a816a182422134",
+      "size": 72174
+    },
+    {
+      "path": "signer/jsQR.js",
+      "role": "metadata",
+      "sha256": "bc40c8a15196236b2314db0856f72ca0b49980cd5413b8c852a7349f5fee0859",
+      "size": 256885
+    },
+    {
+      "path": "signer/manifest.json",
+      "role": "metadata",
+      "sha256": "876f4f85cf79df0ba46b253004833179314353d135b6dcd90161e48106ce74f2",
+      "size": 548
+    },
+    {
+      "path": "signer/signer_terms.md",
+      "role": "metadata",
+      "sha256": "d91e6ea3162da29da0dcc62951f6f55b04eb6c30db0ff7d853288ce702374e27",
+      "size": 2503
+    },
+    {
+      "path": "signer/sodium.js",
+      "role": "metadata",
+      "sha256": "160fc8842737f6200248d04043bc7a2c7c947d5823cd8889d5465871370ee3ec",
+      "size": 740646
+    },
+    {
+      "path": "signer/sw.js",
+      "role": "metadata",
+      "sha256": "db571497043253c711d449a550ff22b38c375d1b28cc9915f3471f1b7708cc64",
+      "size": 3290
+    },
+    {
+      "path": "sodium.js",
+      "role": "metadata",
+      "sha256": "160fc8842737f6200248d04043bc7a2c7c947d5823cd8889d5465871370ee3ec",
+      "size": 740646
+    }
+  ]
+}

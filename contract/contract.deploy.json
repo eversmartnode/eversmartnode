@@ -1,0 +1,7 @@
+{
+  "deployBinPath": "/usr/bin/node",
+  "deployBinArgs": "index.js",
+  "roundtime": 4000,
+  "unl": [],
+  "knownPeers": []
+}

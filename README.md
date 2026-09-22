@@ -1,16 +1,21 @@
-## Hi there 👋
+This works on evrPanel nodes, it has a frontend on gptcp1.
 
-<!--
-**eversmartnode/eversmartnode** is a ✨ _special_ ✨ repository because its `README.md` (this file) appears on your GitHub profile.
+Docker: eversmartnode/eversmartnode:latest
+Github: ghcr.io/eversmartnode/eversmartnode:latest
 
-Here are some ideas to get you started:
+How it works:
 
-- 🔭 I’m currently working on ...
-- 🌱 I’m currently learning ...
-- 👯 I’m looking to collaborate on ...
-- 🤔 I’m looking for help with ...
-- 💬 Ask me about ...
-- 📫 How to reach me: ...
-- 😄 Pronouns: ...
-- ⚡ Fun fact: ...
--->
+You deploy it to an evrPanel node ( a list of them exist on evernode.app ) Then you visit the frontend page (runs on gptcp1) and create a login user in the HotPocket Admin page. You create the user by conecting to hotpocket, the first time you connect you'll have the ability to create the user, after you've done that you need to connect again to log in.
+
+After logging in you can go back to the front page and connect as head admin.
+
+When connected as a head admin, you create your cluster wallet (or import one), you add xah to activate it, then add a trustline and send evr's to the trustline.
+
+After that you pick a bundle of instances (make sure to have a good variety, not all at the same host) to have in the cluster, set a max lease cost (this protects you) and optionally, add additional xahau nodes (fallbacks, seperated by new lines and prioritzed by number). You can also adjust cluster size if you want. 3 signers 5 instances is a good mix though, all instances can sign but only 3 are needed for action. What they sign is extension of cluster life and replacement of instances if one dies. The cluster lives on until it runs out of fuel. Balance adjustment is activated, but it isn't still being fetched by the system, that is something to add in smart contract.
+
+When everything is finished you just hit start autonomous bootstrap and enjoy the show. 
+
+You are free to fork, but this code has no warranties of any kind. It is hastily done and should only be used for experimentation and education.
+
+Project: https://evernode.org 
+Discord: https://discord.gg/DAQszjKEBV

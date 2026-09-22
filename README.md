@@ -15,6 +15,8 @@ After that you pick a bundle of instances (make sure to have a good variety, not
 
 When everything is finished you just hit start autonomous bootstrap and enjoy the show. 
 
+The last thing to do after your cluster is up and running is finalizing, that process will disable your master keys and at this point the cluster is controlled by the cluster itself through multisig.
+
 You are free to fork, but this code has no warranties of any kind. It is hastily done and should only be used for experimentation and education.
 
 Project: https://evernode.org 

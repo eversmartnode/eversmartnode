@@ -1312,17 +1312,35 @@ function localBuildFingerprint() {
   BUILD_FINGERPRINT_CACHE = h.digest('hex');
   return BUILD_FINGERPRINT_CACHE;
 }
+// Autonomous canonical-ledger evidence should be replicated only while a real
+// membership repair/promotion is in flight. In steady autonomous operation the
+// rolling ledger witness remains node-local so ordinary ledger closes do not
+// rewrite HotPocket /state forever.
+function autonomousCanonicalWitnessRequired(state) {
+  if (!state || state.phase !== 'autonomous') return false;
+
+  const maintenance = normalizeMaintenance(state.maintenance, Number(state.targetManagedNodes) || 5);
+  const repairActive = !!(maintenance && maintenance.repair && maintenance.repair.active !== false);
+
+  const promotion = normalizePromotionBatch(state.promotionBatch);
+  const promotionActive = !!(promotion && promotion.active);
+
+  const transitionActive = !!normalizePromotionTransition(state.promotionTransition);
+  const membershipActive = !!normalizeMembershipCommand(state.membershipCommand);
+
+  return repairActive || promotionActive || transitionActive || membershipActive;
+}
+
 function rememberCurrentLedger(state, hpContext, localIsUnl = true) {
   const lcl = Number(hpContext && hpContext.lclSeqNo) || 0;
   const hash = cleanString(hpContext && hpContext.lclHash || '', 256).toLowerCase();
   if (!lcl || !hash) return false;
 
-  // BOOTSTRAP QUIESCENCE RULE:
-  // canonical ledger witnesses are node-local runtime evidence, not contract
-  // state. During growth every CURRENT UNL validator records the same committed
-  // LCL/hash outside the HotPocket state tree. Non-UNL followers never write this
-  // witness. This lets signed candidate reports be checked against canonical
-  // history without changing the replicated /state hash every ledger.
+  // Canonical ledger witnesses are runtime evidence, not ordinary contract state.
+  // Keep the rolling witness outside HotPocket /state on every current validator.
+  // Non-UNL followers do not write it unless they are an autonomous copy or the
+  // bootstrap controller itself. This local file may change every ledger without
+  // moving the replicated state hash.
   const maintainLocalWitness = !!localIsUnl || !state || state.phase === 'autonomous' || hpContext.publicKey === state.bootstrapPubkey;
   if (maintainLocalWitness) {
     const local = readJson(LOCAL_RECENT_LEDGERS_FILE, null);
@@ -1334,10 +1352,25 @@ function rememberCurrentLedger(state, hpContext, localIsUnl = true) {
     }
   }
 
-  // Legacy autonomous recovery may still use the replicated ring. Fresh growth
-  // MUST NOT: a per-ledger ring in autocluster.state.json makes /state a moving
-  // target forever and prevents pre-UNL HPFS followers from settling.
+  // Never mirror routine autonomous ledger progression into replicated state.
+  // A replicated recent-ledger ring is opened only while autonomous membership
+  // repair/promotion actually needs consensus-visible canonical proof.
   if (!localIsUnl || !state || state.phase !== 'autonomous') return false;
+
+  if (!autonomousCanonicalWitnessRequired(state)) {
+    // Upgrade/recovery cleanup: if an older build left a rolling ring in state,
+    // clear it once. Subsequent idle autonomous ledgers return false and do not
+    // call saveState(), leaving /state completely untouched by this mechanism.
+    if (normalizeRecentLedgers(state.recentLedgers).length) {
+      state.recentLedgers = [];
+      return true;
+    }
+    return false;
+  }
+
+  // During an actual autonomous repair/promotion, keep a short replicated proof
+  // window so verifiedSharedRecentLedger() can validate candidate LCL/hash tuples.
+  // The ring is removed automatically once the membership work has finished.
   const before = normalizeRecentLedgers(state.recentLedgers);
   const next = normalizeRecentLedgers([...before, { lcl, hash }]);
   const changed = JSON.stringify(before) !== JSON.stringify(next);

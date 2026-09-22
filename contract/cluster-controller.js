@@ -221,10 +221,11 @@ const ACQUISITION_SETTLE_CLEAN_LEDGERS = 0;
 // Every bootstrap membership patch adds exactly one managed validator. Five clean
 // ledgers must close under the expanded set before the next addition;
 // lifecycle/admin work is fenced during that stabilization window.
-// Bootstrap A remains in the validator set while the complete managed fleet joins.
-// For a managed target of 5, bootstrap temporarily runs A + 5 managed validators
-// (6 total). After the final managed signer set is prepared, one consensus config
-// patch removes Bootstrap A, leaving exactly the configured 5 managed validators.
+// Bootstrap A occupies one slot of the configured validator target during bootstrap.
+// All final managed instances are acquired up front, but only target-1 managed
+// validators join while A is present. After the final managed signer set is
+// prepared, one atomic fixed-size config patch swaps A for the last pre-acquired
+// managed candidate. The committed UNL therefore never grows to target+1.
 const CANDIDATE_READY_FRESH_LCL = 4;
 // READY requires stable forward progress: two exact canonical Bootstrap
 // ledger/hash observations at strictly increasing candidate LCLs (one advance).
@@ -2076,9 +2077,9 @@ async function armBootstrapMeshOverride(run, requestedPubkey = null) {
   if (!bootstrap || !currentUnl.includes(bootstrap)) {
     throw new Error('FORCE ADD refused: Bootstrap A must still be present in the committed HotPocket UNL.');
   }
-  const targetSize = bootstrapBridgeUnlTarget(state);
+  const targetSize = finalManagedTarget(state);
   if (currentUnl.length >= targetSize) {
-    throw new Error(`FORCE ADD refused: temporary bootstrap bridge already has ${currentUnl.length}/${targetSize} validators.`);
+    throw new Error(`FORCE ADD refused: fixed-size bootstrap bridge already has ${currentUnl.length}/${targetSize} validators.`);
   }
 
   const existingMembership = normalizeMembershipCommand(state.membershipCommand);
@@ -2447,7 +2448,7 @@ function confirmMasterHandover(ctx, raw = {}) {
   if (!Number(state.handoverPreparedAtLcl)) {
     state.handoverPreparedAtLcl = Number(ctx.lclSeqNo) || null;
     saveState(state);
-    console.log(`AutoCluster: HANDOVER PREPARATION committed at LCL ${state.handoverPreparedAtLcl || '?'} for quorum=${quorum} signers=[${confirmedAccounts.join(',')}]. All final managed validators are already in UNL; Bootstrap A may now request its removal. DisableMaster remains forbidden until A is absent from committed UNL.`);
+    console.log(`AutoCluster: HANDOVER PREPARATION committed at LCL ${state.handoverPreparedAtLcl || '?'} for quorum=${quorum} signers=[${confirmedAccounts.join(',')}]. Bootstrap A may now request the fixed-size atomic swap with the pre-acquired final managed validator; DisableMaster remains forbidden until A is absent from committed UNL.`);
   } else {
     saveState(state);
   }
@@ -2920,7 +2921,7 @@ function fixedSizeBootstrapHandoverSet(run) {
   const state = run && run.state;
   const target = finalManagedTarget(state);
   const bridgeManagedTarget = bootstrapManagedUnlTarget(state);
-  const bridgeTarget = bootstrapBridgeUnlTarget(state);
+  const lcl = Number(run && run.hpContext && run.hpContext.lclSeqNo) || 0;
   const currentUnl = currentUnlPubkeys(run);
   const currentUnlSet = new Set(currentUnl);
   const bootstrap = cleanString(state && state.bootstrapPubkey || '', 256).toLowerCase();
@@ -2928,32 +2929,33 @@ function fixedSizeBootstrapHandoverSet(run) {
   const stalled = new Set(normalizeCandidateWatchdogs(state && state.candidateWatchdogs)
     .filter(w => w && w.stalledAt && !w.kickedAt)
     .map(w => cleanString(w.pubkey || '',256).toLowerCase()));
-  const unlManaged = all
-    .filter(n => n && currentUnlSet.has(cleanString(n.pubkey || '',256).toLowerCase()))
-    .sort((a,b)=>String(a.pubkey).localeCompare(String(b.pubkey)));
-  const waiting = all
-    .filter(n => n && !currentUnlSet.has(cleanString(n.pubkey || '',256).toLowerCase()) && !stalled.has(cleanString(n.pubkey || '',256).toLowerCase()))
-    .sort((a,b)=>String(a.pubkey).localeCompare(String(b.pubkey)));
+  const unlManaged = all.filter(n => n && currentUnlSet.has(cleanString(n.pubkey || '',256).toLowerCase())).sort((a,b)=>String(a.pubkey).localeCompare(String(b.pubkey)));
+  const waiting = all.filter(n => n && !currentUnlSet.has(cleanString(n.pubkey || '',256).toLowerCase()) && !stalled.has(cleanString(n.pubkey || '',256).toLowerCase())).sort((a,b)=>String(a.pubkey).localeCompare(String(b.pubkey)));
 
-  // Handover begins only after every target managed validator is already a committed
-  // UNL member beside Bootstrap A. For target=5 this means a temporary six-validator
-  // bridge: A + M1..M5. There is no pre-UNL replacement and no atomic A->M swap.
-  // The final consensus membership operation simply removes A.
-  const bridgeReady = currentUnl.length === bridgeTarget &&
-    currentUnl.includes(bootstrap) &&
-    unlManaged.length === bridgeManagedTarget;
-  const allBridgeSigners = unlManaged.length === bridgeManagedTarget &&
-    unlManaged.every(n => /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(String(n.signerAddress || '')));
-  const pubkeys = bridgeReady && allBridgeSigners
-    ? normalizePubkeyList(unlManaged.map(n => n.pubkey))
+  // Committed HotPocket UNL is authoritative here; cluster.json's isUnl bit may
+  // lag a just-committed patch and must never hide the completed fixed-size bridge.
+  // Entering the signing/handover phase is a DURABLE selection step, not the
+  // final live admission proof. Once hard freeze is active, ordinary READY
+  // milestones intentionally stop changing; requiring promotionProofStatus() or
+  // syncQuiescenceStatus() to stay fresh here makes the A+(target-1) bridge
+  // deadlock forever. Freeze M5 from consensus-backed historical qualification,
+  // ACK/maturity and its signed public signer identity. The root controller still
+  // takes a fresh exact-tip/vote/UNL/mesh proof immediately before SWAP_BOOTSTRAP.
+  const eligible = waiting.filter(n => {
+    if (diskNodeStatus(n) !== 'acknowledged') return false;
+    if (!n.signerAddress || !/^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(String(n.signerAddress))) return false;
+    const durable = durableBootstrapQualificationStatus(state, n.pubkey);
+    const maturity = nodeMaturityStability(n, state, lcl);
+    return !!(durable.ready && maturity.ready);
+  });
+  const bridgeReady = currentUnl.length === target && currentUnl.includes(bootstrap) && unlManaged.length === bridgeManagedTarget;
+  const allBridgeSigners = unlManaged.length === bridgeManagedTarget && unlManaged.every(n => /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(String(n.signerAddress || '')));
+  const replacement = eligible[0] || null;
+  const pubkeys = replacement && bridgeReady && allBridgeSigners
+    ? normalizePubkeyList([...unlManaged.map(n => n.pubkey), replacement.pubkey])
     : [];
-  return {
-    target, bridgeTarget, bridgeManagedTarget, currentUnl, all, unlManaged, waiting,
-    eligible:[], replacement:null, bridgeReady, allBridgeSigners,
-    ready:pubkeys.length === target, pubkeys
-  };
+  return { target, bridgeManagedTarget, currentUnl, all, unlManaged, waiting, eligible, replacement, bridgeReady, allBridgeSigners, ready:pubkeys.length === target, pubkeys };
 }
-
 function markSharedMaturityAcknowledged(clusterContext, pubkey, lcl) {
   const claimed = cleanString(pubkey || '', 256).toLowerCase();
   if (!claimed) return { found:false, changed:false, status:'missing' };
@@ -3258,19 +3260,17 @@ function finalManagedTarget(state) {
 }
 
 function bootstrapManagedUnlTarget(state) {
-  // Bootstrap bridge includes every managed validator plus Bootstrap A.
-  // For target=5 the temporary bridge is A + five managed validators (6 total).
-  return finalManagedTarget(state);
-}
-
-function bootstrapBridgeUnlTarget(state) {
-  return finalManagedTarget(state) + 1;
+  // Fixed-size bootstrap: Bootstrap A occupies one committed-UNL slot until the
+  // final handover swap. For target=5 the bridge is A + four managed validators.
+  // The fifth managed validator is already acquired and qualified outside UNL.
+  return Math.max(0, finalManagedTarget(state) - 1);
 }
 
 function bootstrapInitialPhysicalManagedGoal(state) {
   // Acquire the complete final managed fleet up front. Membership admission is a
-  // separate lane, but all target managed validators are allowed to join while
-  // Bootstrap A is still present. The bridge is therefore temporarily target+1.
+  // separate lane: while A remains a validator only target-1 managed instances
+  // enter UNL. The last managed instance stays pre-UNL for the atomic A->managed
+  // handover swap, so no sixth validator is ever introduced for target=5.
   return finalManagedTarget(state);
 }
 
@@ -3283,7 +3283,7 @@ function bootstrapDiskPoolStatus(state) {
   const singletonBootstrap = committedUnl.length === 1 && !!bootstrapKey &&
     committedUnl.some(n => cleanString(n.pubkey || '', 256).toLowerCase() === bootstrapKey);
   // Physical provisioning is intentionally front-loaded: the full managed fleet
-  // exists before the temporary bridge is completed. This keeps handover
+  // exists before the final bootstrap swap. This keeps the handover replacement
   // deterministic and avoids late acquisition after the cluster reaches target size.
   const target = finalTarget;
   const managed = nodes.filter(n => n && n.pubkey && n.pubkey !== (state && state.bootstrapPubkey));
@@ -4058,7 +4058,7 @@ function candidateFinalizationProtectionStatus(state, node, watch, lcl, now, cur
 }
 
 // Bootstrap health must use the same CURRENT canonical proof rule as the
-// temporary bootstrap bridge. Historical READY is not health: the candidate proof must
+// fixed-size bootstrap bridge/swap. Historical READY is not health: the candidate proof must
 // still be recent, canonical, and recently observed by Bootstrap A.
 function currentCanonicalBootstrapReadyPubkeys(state, lcl) {
   const out = new Set();
@@ -4114,11 +4114,11 @@ async function prepareOfficialPromotionPeerWarmup(ctx, state, hpContext, committ
   const finalTarget = finalManagedTarget(state);
   const managedMaterialized = cluster.nodes.filter(n => n && String(n.pubkey || '').toLowerCase() !== String(state.bootstrapPubkey || '').toLowerCase());
   const usableManaged = managedMaterialized.filter(n => n && !stalledPubkeys.has(String(n.pubkey || '').toLowerCase()));
-  // Bootstrap acquires the complete final managed fleet BEFORE any membership
-  // promotion. All target managed validators may then join while A remains, so
-  // target=5 temporarily reaches six validators (A + five managed).
+  // Fixed-size bootstrap acquires the complete final managed fleet BEFORE any
+  // membership promotion. A never grows beyond the configured UNL size: for
+  // target=5 we first materialize five managed instances, then admit only four.
   if (usableManaged.length < finalTarget) return false;
-  if (committedSet.has(String(state.bootstrapPubkey || '').toLowerCase()) && committedSet.size >= finalTarget + 1) return false;
+  if (committedSet.has(String(state.bootstrapPubkey || '').toLowerCase()) && committedSet.size >= finalTarget) return false;
 
   const acknowledged = cluster.nodes
     .filter(n => n && !committedSet.has(String(n.pubkey || '').toLowerCase()) && !stalledPubkeys.has(String(n.pubkey || '').toLowerCase()) && diskNodeStatus(n) === 'acknowledged' && /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(String(n.signerAddress || '')))
@@ -4215,13 +4215,13 @@ function prepareOfficialEverPocketPromotionGate(state, hpContext) {
   const managedMaterialized = nodes.filter(n => n && String(n.pubkey || '').toLowerCase() !== String(state.bootstrapPubkey || '').toLowerCase());
   const usableManaged = managedMaterialized.filter(n => n && !stalledPubkeys.has(String(n.pubkey || '').toLowerCase()));
   // Acquire the whole final managed fleet up front. Promotion begins only after
-  // target healthy/materialized managed instances exist. While Bootstrap A remains,
-  // the committed UNL may temporarily reach target+1 (A + every managed validator).
+  // target healthy/materialized managed instances exist, and while Bootstrap A
+  // remains present the committed UNL is capped at exactly target validators.
   if (usableManaged.length < finalTarget) {
     return hold({ reason:'waiting-full-upfront-managed-fleet', materialized:usableManaged.length, target:finalTarget, currentUnl:currentUnl.length });
   }
-  if (committedSet.has(String(state.bootstrapPubkey || '').toLowerCase()) && committedUnl.length >= finalTarget + 1) {
-    return hold({ reason:'bootstrap-bridge-complete', currentUnl:committedUnl.length, target:finalTarget + 1 });
+  if (committedSet.has(String(state.bootstrapPubkey || '').toLowerCase()) && committedUnl.length >= finalTarget) {
+    return hold({ reason:'fixed-size-bootstrap-bridge-complete', currentUnl:committedUnl.length, target:finalTarget });
   }
 
   const acknowledged = nodes
@@ -4360,11 +4360,11 @@ function prepareCandidatePromotionGate(state, hpContext) {
   //      appears in that canonical proof history.
   if (STOCK_CLONE_BOOTSTRAP && state.phase === 'growing' && currentUnl.includes(state.bootstrapPubkey)) {
     const finalManagedTarget = Math.max(1, Number(state.targetManagedNodes) || 1);
-    const bridgeTargetSize = finalManagedTarget + 1;
-    const bridgeManagedTarget = finalManagedTarget;
+    const bridgeTargetSize = finalManagedTarget;
+    const bridgeManagedTarget = Math.max(0, finalManagedTarget - 1);
     const managedAlreadyUnl = Math.max(0, currentUnl.filter(k => k !== state.bootstrapPubkey).length);
     if (usableManaged.length < finalManagedTarget) {
-      console.log(`AutoCluster: FULL-FLEET ADMISSION WAIT: acquiring full managed fleet ${usableManaged.length}/${finalManagedTarget} before any UNL promotion; Bootstrap A remains singleton/bridge authority.`);
+      console.log(`AutoCluster: FIXED-SIZE ADMISSION WAIT: acquiring full managed fleet ${usableManaged.length}/${finalManagedTarget} before any UNL promotion; Bootstrap A remains singleton/bridge authority.`);
       return hold({ stockCloneBootstrap:true, waitingFullUpfrontFleet:true, usableManaged:usableManaged.length, finalManagedTarget });
     }
     if (currentUnl.length >= bridgeTargetSize || managedAlreadyUnl >= bridgeManagedTarget) {
@@ -4561,8 +4561,8 @@ function prepareCandidatePromotionGate(state, hpContext) {
   // can make progress, and the next candidate may then be admitted.
   if (state.phase === 'growing' && currentUnl.includes(state.bootstrapPubkey)) {
     const finalManagedTarget = Math.max(1, Number(state.targetManagedNodes) || 1);
-    const bridgeTargetSize = finalManagedTarget + 1;
-    const bridgeManagedTarget = finalManagedTarget;
+    const bridgeTargetSize = finalManagedTarget;
+    const bridgeManagedTarget = Math.max(0, finalManagedTarget - 1);
     const managedAlreadyUnl = Math.max(0, currentUnl.filter(k => k !== state.bootstrapPubkey).length);
     if (usableManaged.length < finalManagedTarget) {
       return hold({ promotionQueued:false, incrementalBootstrap:true, waitingFullUpfrontFleet:true, usableManaged:usableManaged.length, finalManagedTarget });
@@ -4810,22 +4810,24 @@ async function preparePurePostJoinMembershipIntent(ctx, state, hpContext, cluste
       console.log(`AutoCluster: ATOMIC FINAL-PROOF MIGRATION cleared legacy unsubmitted ADD intent ${cleanString(legacy.pubkey,24)} at LCL ${Number(hpContext && hpContext.lclSeqNo)||'?'}; one stable catch-up ledger may follow, then proof-first ADD_UNL resumes without a replicated pre-intent.`);
     }
 
-    // Full temporary bridge completion must be reachable INSIDE the permanent
-    // consensus-purity fence. The final managed validator is admitted normally,
-    // producing A + target managed validators. Only after that complete bridge is
-    // committed do we freeze the managed signer set and enter signer preparation.
+    // Fixed-size bridge completion must be reachable INSIDE the permanent
+    // consensus-purity fence. The prior build left the phase transition later in
+    // tick(), but begin() returns a postJoinConsensusPurityFence run as soon as
+    // A + target-1 managed validators are committed, so tick() can never reach
+    // that block. Advance only from shared committed state on CURRENT UNL nodes.
     const cfg = await ctx.getConfig();
     const currentUnl = readContractUnlFromConfig(cfg);
     const local = cleanString(hpContext && hpContext.publicKey || '',256).toLowerCase();
     const bootstrap = cleanString(state.bootstrapPubkey || '',256).toLowerCase();
     const target = finalManagedTarget(state);
-    const bridgeTarget = bootstrapBridgeUnlTarget(state);
-    if (state.phase === 'growing' && currentUnl.includes(local) && currentUnl.includes(bootstrap) && currentUnl.length === bridgeTarget) {
+    if (state.phase === 'growing' && currentUnl.includes(local) && currentUnl.includes(bootstrap) && currentUnl.length === target) {
       const handover = fixedSizeBootstrapHandoverSet({ state, hpContext, clusterContext, committedUnl:currentUnl });
       if (handover.bridgeReady) {
-        if (!handover.ready) {
-          const signed = handover.unlManaged.filter(n => /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(String(n.signerAddress || ''))).length;
-          console.log(`AutoCluster: TEMPORARY BRIDGE handover fence waiting for managed signer identities ${signed}/${handover.target}; UNL already contains Bootstrap A + all ${handover.target} managed validators.`);
+        if (handover.all.length < handover.target) {
+          console.log(`AutoCluster: FIXED-SIZE HANDOVER purity fence waiting for full upfront managed fleet ${handover.all.length}/${handover.target}; UNL remains Bootstrap A + ${handover.bridgeManagedTarget} managed.`);
+        } else if (!handover.ready) {
+          const signed = handover.all.filter(n => /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(String(n.signerAddress || ''))).length;
+          console.log(`AutoCluster: FIXED-SIZE HANDOVER purity fence waiting for durable final replacement: bridge=${handover.unlManaged.length}/${handover.bridgeManagedTarget}, signer-identities=${signed}/${handover.target}, durable-eligible-final=${handover.eligible.length}. Fresh exact-tip proof is intentionally deferred to SWAP_BOOTSTRAP.`);
         } else {
           const keep = new Set(handover.pubkeys);
           const currentSet = new Set(handover.currentUnl);
@@ -4837,7 +4839,7 @@ async function preparePurePostJoinMembershipIntent(ctx, state, hpContext, cluste
           state.handoverSignerPubkeys = handover.pubkeys;
           state.phase = 'signing';
           saveState(state);
-          console.log(`AutoCluster: HANDOVER READY INSIDE PURITY FENCE at LCL ${Number(hpContext && hpContext.lclSeqNo)||'?'}: UNL=${handover.currentUnl.length}/${bridgeTarget} (Bootstrap A + ${handover.bridgeManagedTarget} managed), signer identities=${handover.pubkeys.length}/${handover.target}${surplusPreUnl.length?`, surplus-pre-UNL-retained=${surplusPreUnl.length}`:''}. Entering signing; final membership step will remove Bootstrap A only.`);
+          console.log(`AutoCluster: FIXED-SIZE HANDOVER READY INSIDE PURITY FENCE at LCL ${Number(hpContext && hpContext.lclSeqNo)||'?'}: UNL=${handover.currentUnl.length}/${handover.target} (Bootstrap A + ${handover.bridgeManagedTarget} managed), frozen replacement=${cleanString(handover.replacement.pubkey,24)}, signer identities=${handover.pubkeys.length}/${handover.target}${surplusPreUnl.length?`, surplus-pre-UNL-retained=${surplusPreUnl.length}`:''}. Entering signing; exact-tip/vote/mesh will be re-proven immediately before atomic SWAP_BOOTSTRAP.`);
           return true;
         }
       }
@@ -4868,7 +4870,7 @@ async function preparePurePostJoinMembershipIntent(ctx, state, hpContext, cluste
   const cfg = await ctx.getConfig();
   const currentUnl = readContractUnlFromConfig(cfg);
   const targetManaged = Math.max(1, Number(state.targetManagedNodes) || 1);
-  const bridgeTarget = targetManaged + 1;
+  const bridgeTarget = targetManaged;
   if (!currentUnl.includes(state.bootstrapPubkey) || currentUnl.length >= bridgeTarget || currentUnl.includes(selectedPubkey)) return false;
 
   const requiredPeers = requiredAdmissionPeers(currentUnl.length);
@@ -4890,7 +4892,7 @@ async function preparePurePostJoinMembershipIntent(ctx, state, hpContext, cluste
     }
     state.membershipCommand = makeBootstrapAddMembershipCommand(
       state, selectedNode, lcl,
-      `ACKNOWLEDGED + durable pre-freeze qualification; atomic live FINAL proof required for temporary-bridge ADD_UNL ${currentUnl.length}->${currentUnl.length + 1}`
+      `ACKNOWLEDGED + durable pre-freeze qualification; atomic live FINAL proof required for fixed-size ADD_UNL ${currentUnl.length}->${currentUnl.length + 1}`
     );
     if (state.promotionBatch && state.promotionBatch.active) {
       state.promotionBatch.reason = `alpha41 consensus-purity: awaiting authenticated HotPocket ADD_UNL command for ${selectedPubkey}`;
@@ -5306,6 +5308,7 @@ async function begin(ctx) {
   const localPublicKey = cleanString((ctx && ctx.publicKey) || hpContext.publicKey || '', 256).toLowerCase();
   const localIsUnl = !!localPublicKey && committedUnl.includes(localPublicKey);
   hpContext.__everSmartNodeCommittedUnl = committedUnl;
+  lightweightAutonomousMissingUnlPreflight(state, hpContext, committedUnl);
 
   // Diagnostic only. A mismatch is exactly the activation race this build is
   // designed to survive; it MUST NOT affect replicated control flow.
@@ -5553,9 +5556,11 @@ async function begin(ctx) {
     }
   }
 
-  // Bootstrap temporarily permits target+1 UNL membership. Once A + all target
-  // managed validators are committed, normalize the threshold if needed. tick()
-  // freezes that exact managed set and then enters the handover fence.
+  // Fixed-size bootstrap never creates target+1 UNL membership. Once A +
+  // target-1 managed validators are committed, normalize the threshold if needed
+  // but remain in growing mode until the final pre-acquired managed candidate has
+  // ACK + current READY/SYNC + its signed public signer identity. tick() freezes
+  // that exact final set and only then enters the handover fence.
   if (state.phase === 'growing' && localIsUnl) {
     const disk = readJson(path.resolve(process.cwd(), 'cluster.json'), null);
     const diskNodes = disk && Array.isArray(disk.nodes) ? disk.nodes : [];
@@ -5563,14 +5568,14 @@ async function begin(ctx) {
     const committedUnlCount = alpha41CommittedUnl.length;
     const target = finalManagedTarget(state);
     const bridgeManaged = bootstrapManagedUnlTarget(state);
-    if (committedUnlCount >= target + 1 && managedUnlCount >= bridgeManaged) {
+    if (committedUnlCount >= target && managedUnlCount >= bridgeManaged) {
       const bridgeCfg = await ctx.getConfig();
       const currentThreshold = readConsensusThreshold(bridgeCfg);
       const desiredThreshold = signerMatchedBootstrapThreshold(state);
       if (currentThreshold !== desiredThreshold) {
         setConsensusThreshold(bridgeCfg, desiredThreshold);
         await ctx.updateConfig(bridgeCfg);
-        console.log(`AutoCluster: TEMPORARY BOOTSTRAP BRIDGE threshold normalization submitted at LCL ${Number(hpContext.lclSeqNo) || '?'}: ${currentThreshold}% -> ${desiredThreshold}% on ${committedUnlCount}/${target + 1} validators. UNL size is unchanged.`);
+        console.log(`AutoCluster: FIXED-SIZE BRIDGE threshold normalization submitted at LCL ${Number(hpContext.lclSeqNo) || '?'}: ${currentThreshold}% -> ${desiredThreshold}% on ${committedUnlCount}/${target} validators. UNL size is unchanged.`);
       }
     }
   }
@@ -6189,9 +6194,9 @@ async function begin(ctx) {
 
   // EverPocket owns validator admission; AutoCluster only supplies the READY/SYNC/mesh hold gate.
   // Streaming bootstrap admits exactly ONE managed validator per config patch,
-  // starting with 1->2. The next committed HotPocket ledger unlocks the next
-  // addition. A remains until all target managed validators are in UNL; after
-  // treasury preparation the final membership operation removes A.
+  // starting with 1->2. The next
+  // committed HotPocket ledger unlocks the next addition. A remains until
+  // target-1 managed validators are in UNL; the last pre-acquired managed node replaces A atomically after treasury preparation.
   // Autonomous repair remains single-node as well, but keeps its longer fence.
   if (!OFFICIAL_EVERPOCKET_MEMBERSHIP && promotionGate && promotionGate.directPromotion && Array.isArray(promotionGate.pubkeys) && promotionGate.pubkeys.length) {
     if (promotionGate.incrementalBootstrap === true && state.phase === 'growing') {
@@ -6218,7 +6223,7 @@ async function begin(ctx) {
           const cfg = await ctx.getConfig();
           const configUnl = readContractUnlFromConfig(cfg);
           const finalManagedTarget = Math.max(1, Number(state.targetManagedNodes) || 1);
-          const bridgeTargetSize = finalManagedTarget + 1;
+          const bridgeTargetSize = finalManagedTarget;
           if (!configUnl.includes(state.bootstrapPubkey)) {
             throw new Error('INCREMENTAL_BOOTSTRAP_REQUIRES_A: Bootstrap A is not present in committed UNL.');
           }
@@ -6733,9 +6738,9 @@ async function feedUserMessage(run, user, raw) {
           console.log(`AutoCluster: ${opLabel} target ${cleanString(pubkey,24)} is already committed; marked command submitted idempotently.`);
           return true;
         }
-        const targetSize = bootstrapBridgeUnlTarget(run.state);
-        if (!swappingBootstrap && currentUnl.length >= targetSize) throw new Error(`ADD_UNL refused: temporary bootstrap bridge already has ${currentUnl.length}/${targetSize} validators.`);
-        if (swappingBootstrap && currentUnl.length !== finalManagedTarget(run.state)) throw new Error(`SWAP_BOOTSTRAP refused: legacy swap mode requires the old target-sized bridge.`);
+        const targetSize = finalManagedTarget(run.state);
+        if (!swappingBootstrap && currentUnl.length >= targetSize) throw new Error(`ADD_UNL refused: fixed-size bootstrap bridge already has ${currentUnl.length}/${targetSize} validators.`);
+        if (swappingBootstrap && currentUnl.length !== targetSize) throw new Error(`SWAP_BOOTSTRAP refused: committed UNL is ${currentUnl.length}/${targetSize}; fixed-size swap requires the target-sized bridge.`);
         const node = run.clusterContext.getClusterNodes().find(n => n && String(n.pubkey).toLowerCase() === pubkey) || null;
         if (!node || node.isUnl) throw new Error(`${opLabel} refused: ${pubkey} is not a materialized non-UNL managed candidate.`);
         if (!/^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(String(node.signerAddress || ''))) throw new Error(`${opLabel} refused: ${pubkey} has not committed its signed public managed signer identity yet.`);
@@ -8016,7 +8021,7 @@ async function retireBootstrapDirect(run) {
 async function observeMasterHandover(run) {
   if (run.state.phase !== 'ready-to-handover') return false;
   if (!Number(run.state.handoverPreparedAtLcl)) {
-    console.log('AutoCluster: final managed signer set is frozen, but Bootstrap A removal waits for the consensus handover-prepared confirmation (SignerList + reward tracking ready; master key still enabled).');
+    console.log('AutoCluster: final managed signer set is frozen, but the fixed-size A->managed swap waits for the consensus handover-prepared confirmation (SignerList + reward tracking ready; master key still enabled).');
     return false;
   }
   const allManaged = managedNodes(run, false);
@@ -8037,34 +8042,144 @@ async function observeMasterHandover(run) {
     console.log(`AutoCluster: Bootstrap A is already absent but frozen managed set still has ${outside.length} member(s) outside UNL; refusing a second handover mutation.`);
     return false;
   }
-  if (currentUnl.length !== expectedCount + 1 || outside.length !== 0) {
-    console.log(`AutoCluster: handover waits for Bootstrap A + all ${expectedCount} managed validators in UNL: unl=${currentUnl.length}/${expectedCount + 1}, outsideFrozen=[${outside.join(',')}].`);
+  if (currentUnl.length !== expectedCount || outside.length !== 1) {
+    console.log(`AutoCluster: fixed-size handover waits for exactly one pre-UNL final managed validator: unl=${currentUnl.length}/${expectedCount}, outsideFrozen=[${outside.join(',')}].`);
+    return false;
+  }
+  const replacement = outside[0];
+  const replacementNode = byPubkey.get(replacement) || null;
+  if (!replacementNode || replacementNode.isUnl || diskNodeStatus(replacementNode) !== 'acknowledged') {
+    console.log(`AutoCluster: fixed-size handover replacement ${cleanString(replacement,24)} is not a materialized ACKNOWLEDGED pre-UNL candidate.`);
     return false;
   }
 
   const existing = normalizeMembershipCommand(run.state.membershipCommand);
   if (existing) {
-    if (existing.operation === 'remove-bootstrap' && existing.pubkey === bootstrap) {
-      console.log(`AutoCluster: waiting for Bootstrap A control plane to submit pending REMOVE_UNL(A) command requested at LCL ${existing.requestedAtLcl || '?'}.`);
+    if (existing.operation === 'swap-bootstrap' && existing.pubkey === replacement) {
+      console.log(`AutoCluster: waiting for Bootstrap A control plane to submit pending fixed-size SWAP_BOOTSTRAP command requested at LCL ${existing.requestedAtLcl || '?'}.`);
       return true;
     }
-    console.log(`AutoCluster: handover removal waiting because membership command ${existing.operation}:${cleanString(existing.pubkey,24)} is still active.`);
+    console.log(`AutoCluster: handover swap waiting because membership command ${existing.operation}:${cleanString(existing.pubkey,24)} is still active.`);
     return true;
   }
 
   run.state.membershipCommand = {
     active:true,
-    operation:'remove-bootstrap',
-    pubkey:bootstrap,
+    operation:'swap-bootstrap',
+    pubkey:replacement,
     requestedAtLcl:Number(run.hpContext && run.hpContext.lclSeqNo) || null,
     submittedAtLcl:null,
-    reason:'final handover consensus operation: remove Bootstrap A after all target managed validators are already committed in UNL'
+    reason:'final fixed-size consensus operation: atomically replace Bootstrap A with the pre-acquired final managed validator before DisableMaster'
   };
   saveState(run.state);
-  console.log(`AutoCluster: HOTPOCKET REMOVE_UNL(A) COMMAND REQUESTED at LCL ${run.hpContext.lclSeqNo || '?'}: temporary bridge ${currentUnl.length}->${expectedCount}; all managed validators remain. DisableMaster stays deferred until A is absent.`);
+  console.log(`AutoCluster: HOTPOCKET FIXED-SIZE SWAP COMMAND REQUESTED at LCL ${run.hpContext.lclSeqNo || '?'}: remove Bootstrap A + add ${cleanString(replacement,24)} in one config patch; UNL size remains ${expectedCount}. DisableMaster stays deferred until A is absent.`);
   return true;
 }
 
+
+function lightweightAutonomousMissingUnlPreflight(state, hpContext, committedUnl) {
+  if (!state || state.phase !== 'autonomous') return false;
+  state.maintenance = normalizeMaintenance(state.maintenance, state.targetManagedNodes);
+  const m = state.maintenance;
+  if (!m.enabled || (m.repair && m.repair.active !== false)) return false;
+
+  const lcl = Number(hpContext && hpContext.lclSeqNo) || 0;
+  const now = normalizeConsensusTimestampMs(hpContext && hpContext.timestamp);
+  if (!lcl || !now) return false;
+
+  const bootstrap = cleanString(state.bootstrapPubkey || '', 256).toLowerCase();
+  const expected = normalizePubkeyList(committedUnl).filter(pk => pk && pk !== bootstrap);
+  if (!expected.length) return false;
+
+  const disk = readJson(path.resolve(process.cwd(), 'cluster.json'), null);
+  const nodes = disk && Array.isArray(disk.nodes) ? disk.nodes : [];
+  const byPubkey = new Map(nodes
+    .filter(n => n && n.pubkey)
+    .map(n => [cleanString(n.pubkey,256).toLowerCase(), n]));
+  const validators = new Map(normalizeValidatorRecords(state.validators)
+    .map(v => [cleanString(v.publicKey,256).toLowerCase(), v]));
+  const old = new Map((m.health || []).map(h => [cleanString(h.pubkey,256).toLowerCase(), h]));
+
+  let changed = false;
+  let dead = null;
+  const next = [];
+
+  for (const pubkey of expected) {
+    const node = byPubkey.get(pubkey) || null;
+    const prior = old.get(pubkey) || {};
+    const validator = validators.get(pubkey) || {};
+    let rec = { ...prior, pubkey };
+
+    if (!node) {
+      const suspectSinceAt = Number(prior.suspectSinceAt) || now;
+      const age = Math.max(0, now - suspectSinceAt);
+      const status = age >= m.healthTimeoutMs ? 'dead' : 'suspect';
+      const deadSinceAt = status === 'dead' ? (Number(prior.deadSinceAt) || now) : null;
+      rec = {
+        pubkey,
+        host: normalizeHostAddress(validator.hostAddress || prior.host),
+        status,
+        activeOnLcl: Number(prior.activeOnLcl) || Number(validator.activeOnLcl) || null,
+        // This is a transition timestamp only. Do not advance it every ledger.
+        lastObservedLcl: prior.status === status && prior.lastObservedLcl ? prior.lastObservedLcl : lcl,
+        suspectSinceAt,
+        deadSinceAt
+      };
+      if (!dead && status === 'dead') dead = rec;
+    } else if (prior.status === 'suspect' && prior.suspectSinceAt) {
+      // A validator that re-materialized before timeout recovers immediately if
+      // its activity is current. This prevents a transient cluster-row gap from
+      // later being promoted to DEAD just because the 100-ledger heavy pass has
+      // not run yet.
+      const active = Number(node.activeOnLcl) || Number(prior.activeOnLcl) || Number(validator.activeOnLcl) || 0;
+      const stale = active > 0 ? Math.max(0, lcl - active) : Number.MAX_SAFE_INTEGER;
+      if (active > 0 && stale <= m.suspectAfterLcl) {
+        rec = {
+          pubkey,
+          host: normalizeHostAddress(node.host) || normalizeHostAddress(validator.hostAddress) || prior.host || null,
+          status:'healthy',
+          activeOnLcl:Number(prior.activeOnLcl) || active || null,
+          lastObservedLcl:lcl,
+          suspectSinceAt:null,
+          deadSinceAt:null
+        };
+      }
+    }
+
+    next.push(rec);
+    if (JSON.stringify(rec) !== JSON.stringify(prior)) changed = true;
+  }
+
+  m.health = next.sort((a,b)=>a.pubkey.localeCompare(b.pubkey));
+
+  if (dead && !m.repair) {
+    m.repair = {
+      active:true,
+      phase:'replacement-needed',
+      deadPubkey:dead.pubkey,
+      deadHost:dead.host || null,
+      startedAt:now,
+      startedAtLcl:lcl,
+      baselineUnlPubkeys:normalizePubkeyList(committedUnl),
+      replacementPubkey:null,
+      replacementHost:null,
+      lastUpdatedAt:now,
+      lastError:null
+    };
+    m.lastAction = `Validator ${dead.pubkey} is still committed in HotPocket UNL but missing from EverPocket cluster materialization; preparing a replacement before removal.`;
+    changed = true;
+    console.log(`AutoCluster: AUTONOMOUS MISSING-UNL DEAD ${cleanString(dead.pubkey,80)}; committed UNL still expects it, so replacement-first repair is armed.`);
+  }
+
+  if (changed) {
+    saveState(state);
+    if (!dead) {
+      const suspect = m.health.find(h => h.status === 'suspect');
+      if (suspect) console.log(`AutoCluster: AUTONOMOUS MISSING-UNL SUSPECT ${cleanString(suspect.pubkey,80)}; committed UNL expects it but cluster.json no longer materializes it.`);
+    }
+  }
+  return changed;
+}
 
 function refreshAutonomousMaintenanceHealth(run) {
   const state = run.state;
@@ -8073,32 +8188,77 @@ function refreshAutonomousMaintenanceHealth(run) {
   if (state.phase !== 'autonomous' || !m.enabled) return { changed:false, dead:null };
   const now = consensusNowMs(run), lcl = Number(run.hpContext && run.hpContext.lclSeqNo) || 0;
   if (!now || !lcl) return { changed:false, dead:null };
-  const managedUnl = managedNodes(run, true);
+
+  // Consensus membership is authoritative. A validator that disappears from
+  // EverPocket's materialized cluster view must NOT disappear from health
+  // monitoring while HotPocket still has it in committed UNL.
+  const bootstrap = cleanString(state.bootstrapPubkey || '', 256).toLowerCase();
+  const expectedPubkeys = currentUnlPubkeys(run).filter(pk => pk && pk !== bootstrap);
+  const managed = managedNodes(run, false);
+  const byPubkey = new Map(managed.filter(n => n && n.pubkey).map(n => [cleanString(n.pubkey,256).toLowerCase(), n]));
+  const validators = new Map(normalizeValidatorRecords(state.validators).map(v => [cleanString(v.publicKey,256).toLowerCase(), v]));
   const old = new Map((m.health || []).map(h => [h.pubkey, h]));
   const health = [];
   let changed = false, dead = null;
-  for (const node of managedUnl) {
-    const previous = old.get(node.pubkey) || {};
-    const active = Number(node.activeOnLcl) || 0;
-    const staleLedgers = active > 0 ? Math.max(0, lcl - active) : 0;
-    let status = 'unknown', suspectSinceAt = Number(previous.suspectSinceAt) || null, deadSinceAt = Number(previous.deadSinceAt) || null;
-    // Never declare a node dead if EverPocket has not supplied an activity LCL.
-    // This prevents a migration/metadata gap from evicting a healthy validator.
-    if (active > 0 && staleLedgers <= m.suspectAfterLcl) {
-      status = 'healthy'; suspectSinceAt = null; deadSinceAt = null;
-    } else if (active > 0) {
+
+  for (const pubkey of expectedPubkeys) {
+    const node = byPubkey.get(pubkey) || null;
+    const previous = old.get(pubkey) || {};
+    const validator = validators.get(pubkey) || {};
+    const observedActive = Number(node && node.activeOnLcl) || Number(previous.activeOnLcl) || Number(validator.activeOnLcl) || 0;
+    const staleLedgers = observedActive > 0 ? Math.max(0, lcl - observedActive) : 0;
+    let status = 'unknown';
+    let suspectSinceAt = Number(previous.suspectSinceAt) || null;
+    let deadSinceAt = Number(previous.deadSinceAt) || null;
+
+    if (!node) {
+      if (!suspectSinceAt) suspectSinceAt = now;
+      const age = Math.max(0, now - suspectSinceAt);
+      status = age >= m.healthTimeoutMs ? 'dead' : 'suspect';
+      if (status === 'dead' && !deadSinceAt) deadSinceAt = now;
+    } else if (observedActive > 0 && staleLedgers <= m.suspectAfterLcl) {
+      status = 'healthy';
+      suspectSinceAt = null;
+      deadSinceAt = null;
+    } else if (observedActive > 0) {
       if (!suspectSinceAt) suspectSinceAt = now;
       const age = Math.max(0, now - suspectSinceAt);
       status = age >= m.healthTimeoutMs ? 'dead' : 'suspect';
       if (status === 'dead' && !deadSinceAt) deadSinceAt = now;
     }
-    const rec = { pubkey:node.pubkey, host:normalizeHostAddress(node.host), status, activeOnLcl:active || null, lastObservedLcl:lcl, suspectSinceAt, deadSinceAt };
+
+    // Do not turn a healthy activeOnLcl heartbeat into replicated state churn.
+    // Persist activity only when first learned or while unhealthy; live activity
+    // is read directly from cluster.json/ClusterContext on each lifecycle run.
+    const storedActive = status === 'healthy' && Number(previous.activeOnLcl)
+      ? Number(previous.activeOnLcl)
+      : (observedActive || null);
+    const semanticChanged = previous.status !== status ||
+      (previous.host || null) !== (normalizeHostAddress(node && node.host) || validator.hostAddress || previous.host || null) ||
+      Number(previous.activeOnLcl || 0) !== Number(storedActive || 0) ||
+      Number(previous.suspectSinceAt || 0) !== Number(suspectSinceAt || 0) ||
+      Number(previous.deadSinceAt || 0) !== Number(deadSinceAt || 0);
+
+    const rec = {
+      pubkey,
+      host: normalizeHostAddress(node && node.host) || validator.hostAddress || previous.host || null,
+      status,
+      activeOnLcl: storedActive,
+      lastObservedLcl: semanticChanged ? lcl : (Number(previous.lastObservedLcl) || null),
+      suspectSinceAt,
+      deadSinceAt
+    };
     health.push(rec);
     if (JSON.stringify(rec) !== JSON.stringify(previous)) changed = true;
     if (!dead && status === 'dead') dead = rec;
   }
-  if (health.length && health.every(h => h.status === 'healthy')) {
-    if (m.lastHealthyLcl !== lcl) { m.lastHealthyLcl = lcl; m.lastHealthyAt = now; changed = true; }
+
+  const allHealthy = health.length > 0 && health.every(h => h.status === 'healthy');
+  const wasAllHealthy = expectedPubkeys.length > 0 && expectedPubkeys.every(pk => (old.get(pk) || {}).status === 'healthy');
+  if (allHealthy && (!wasAllHealthy || !m.lastHealthyLcl)) {
+    m.lastHealthyLcl = lcl;
+    m.lastHealthyAt = now;
+    changed = true;
   }
   m.health = health.sort((a,b)=>a.pubkey.localeCompare(b.pubkey));
   if (changed) saveState(state);
@@ -8153,20 +8313,39 @@ async function advanceAutonomousRepair(run) {
   }
   r.lastUpdatedAt = now || r.lastUpdatedAt;
 
-  // Never retire the dead validator while a validator-set stabilization gate is active.
   const stab = normalizeStabilization(state.stabilization);
-  if (replacement && replacement.isUnl && replacement.signerAddress && !(stab && stab.active) && dead && dead.isUnl) {
-    console.log(`AutoCluster: replacement ${cleanString(replacement.pubkey,80)} is UNL + signed. Retiring dead validator ${cleanString(r.deadPubkey,80)} in a separate membership change.`);
+  const committedUnl = currentUnlPubkeys(run);
+  const deadCommitted = committedUnl.includes(r.deadPubkey);
+
+  // Replacement-first safety still applies when the failed validator vanished
+  // from EverPocket's materialized cluster row. In that case retire it directly
+  // from committed HotPocket UNL after the replacement is UNL + signed.
+  if (replacement && replacement.isUnl && replacement.signerAddress && !(stab && stab.active) && deadCommitted) {
+    console.log('AutoCluster: replacement ' + cleanString(replacement.pubkey,80) + ' is UNL + signed. Retiring dead validator ' + cleanString(r.deadPubkey,80) + ' in a separate membership change.');
     r.phase = 'retiring-dead-validator';
-    m.lastAction = `Replacement ${replacement.pubkey} is ready; retiring dead validator ${r.deadPubkey}.`;
+    m.lastAction = 'Replacement ' + replacement.pubkey + ' is ready; retiring dead validator ' + r.deadPubkey + '.';
     saveState(state);
-    await run.clusterContext.removeNode(r.deadPubkey, true);
+
+    if (dead && dead.isUnl) {
+      await run.clusterContext.removeNode(r.deadPubkey, true);
+    } else {
+      const nextUnl = normalizePubkeyList(committedUnl.filter(pk => pk !== r.deadPubkey));
+      if (nextUnl.length !== Number(state.targetManagedNodes)) {
+        throw new Error('AUTONOMOUS_REPAIR_REMOVE_SIZE: expected ' + state.targetManagedNodes + ' validators after removing missing ' + r.deadPubkey + ', got ' + nextUnl.length + '.');
+      }
+      await applyFullUnlPeerMesh(run, nextUnl, 'AUTONOMOUS_REPAIR remove missing ' + cleanString(r.deadPubkey,24));
+      const manager = run.clusterContext && run.clusterContext.clusterManager;
+      if (manager && typeof manager.markAsQuorum === 'function') manager.markAsQuorum(r.deadPubkey, null);
+      if (manager && typeof manager.removeNode === 'function') manager.removeNode(r.deadPubkey);
+      if (run.hpContext) run.hpContext.__everSmartNodeConfigTransitionThisExecution = true;
+      run.deferTickOnce = true;
+    }
     return true;
   }
 
-  // After the dead validator has disappeared and the replacement set stabilized,
-  // normalize the signer list back to target count/quorum, then declare repair complete.
-  const deadGone = !unl.some(n => n.pubkey === r.deadPubkey);
+  // A validator is gone only when it is gone from COMMITTED UNL, not merely
+  // because EverPocket can no longer materialize its cluster row.
+  const deadGone = !committedUnl.includes(r.deadPubkey);
   if (deadGone && !(stab && stab.active)) {
     r.phase = 'normalizing-signers';
     saveState(state);
@@ -8174,8 +8353,8 @@ async function advanceAutonomousRepair(run) {
     if (changed) return true;
     const currentManagedUnl = managedNodes(run, true);
     if (currentManagedUnl.length === state.targetManagedNodes && currentManagedUnl.every(n => n.signerAddress)) {
-      console.log(`AutoCluster: AUTONOMOUS REPAIR complete. Replaced ${cleanString(r.deadPubkey,80)} with ${cleanString(r.replacementPubkey || 'replacement',80)}; cluster restored to ${state.targetManagedNodes} managed validators.`);
-      m.lastAction = `Repair complete: replaced ${r.deadPubkey} with ${r.replacementPubkey || 'replacement'}.`;
+      console.log('AutoCluster: AUTONOMOUS REPAIR complete. Replaced ' + cleanString(r.deadPubkey,80) + ' with ' + cleanString(r.replacementPubkey || 'replacement',80) + '; cluster restored to ' + state.targetManagedNodes + ' managed validators.');
+      m.lastAction = 'Repair complete: replaced ' + r.deadPubkey + ' with ' + (r.replacementPubkey || 'replacement') + '.';
       m.repair = null;
       saveState(state);
       return true;
@@ -8290,6 +8469,7 @@ function syncValidatorRecords(run) {
   const acquired = run.evernodeContext && typeof run.evernodeContext.getAcquiredNodes === 'function'
     ? (run.evernodeContext.getAcquiredNodes() || []) : [];
   const health = new Map(((state.maintenance && state.maintenance.health) || []).filter(Boolean).map(h => [h.pubkey, h]));
+  const committedUnl = new Set(currentUnlPubkeys(run));
   const records = [];
 
   for (const node of managed) {
@@ -8304,6 +8484,8 @@ function syncValidatorRecords(run) {
     const hostAddress = nodeHost || normalizeHostAddress(acquire && acquire.host) || prior.hostAddress || null;
     const queueItem = hostAddress ? hostEntry(state, hostAddress) : null;
     const h = health.get(node.pubkey) || null;
+    const observedActive = Number(node.activeOnLcl) || (h && Number(h.activeOnLcl)) || prior.activeOnLcl || null;
+    const storedActive = node.isUnl && (!h || h.status === 'healthy') && prior.activeOnLcl ? prior.activeOnLcl : observedActive;
     const record = {
       publicKey: cleanString(node.pubkey, 256),
       hostAddress,
@@ -8318,15 +8500,13 @@ function syncValidatorRecords(run) {
       present: true,
       maturityStatus: clusterNodeStatusName(node) || prior.maturityStatus || null,
       health: h && ['healthy','suspect','dead','unknown'].includes(h.status) ? h.status : (node.isUnl ? (prior.health === 'dead' ? 'dead' : 'unknown') : 'candidate'),
-      activeOnLcl: Number(node.activeOnLcl) || (h && Number(h.activeOnLcl)) || prior.activeOnLcl || null,
+      activeOnLcl: storedActive,
       createdOnTimestamp: Number(node.createdOnTimestamp) || prior.createdOnTimestamp || null,
       lifeMoments: Number.isFinite(Number(node.lifeMoments)) ? Number(node.lifeMoments) : (prior.lifeMoments ?? null),
       targetLifeMoments: Number.isFinite(Number(node.targetLifeMoments)) ? Number(node.targetLifeMoments) : (prior.targetLifeMoments ?? null),
       maxLifeMoments: Number.isFinite(Number(node.maxLifeMoments)) ? Number(node.maxLifeMoments) : (prior.maxLifeMoments ?? null),
       firstSeenAt: prior.firstSeenAt || now || null,
       firstSeenLcl: prior.firstSeenLcl || lcl || null,
-      // These are mutation timestamps, not a per-ledger heartbeat. They are filled
-      // below only when the semantic validator record actually changes.
       lastUpdatedAt: prior.lastUpdatedAt || null,
       lastUpdatedLcl: prior.lastUpdatedLcl || null,
       retiredAt: null,
@@ -8334,14 +8514,8 @@ function syncValidatorRecords(run) {
     };
     const semanticPrior = normalizeValidatorRecords([prior])[0] || null;
     const semanticNext = normalizeValidatorRecords([record])[0] || null;
-    if (semanticPrior) {
-      semanticPrior.lastUpdatedAt = null;
-      semanticPrior.lastUpdatedLcl = null;
-    }
-    if (semanticNext) {
-      semanticNext.lastUpdatedAt = null;
-      semanticNext.lastUpdatedLcl = null;
-    }
+    if (semanticPrior) { semanticPrior.lastUpdatedAt = null; semanticPrior.lastUpdatedLcl = null; }
+    if (semanticNext) { semanticNext.lastUpdatedAt = null; semanticNext.lastUpdatedLcl = null; }
     if (!semanticPrior || JSON.stringify(semanticNext) !== JSON.stringify(semanticPrior)) {
       record.lastUpdatedAt = now || prior.lastUpdatedAt || null;
       record.lastUpdatedLcl = lcl || prior.lastUpdatedLcl || null;
@@ -8350,10 +8524,27 @@ function syncValidatorRecords(run) {
     old.delete(node.pubkey);
   }
 
-  // Preserve historical endpoint/acquisition linkage after a validator leaves
-  // the active cluster. This is intentionally metadata-only history: retired
-  // records are never used to decide consensus membership or acquisitions.
   for (const prior of old.values()) {
+    const stillCommitted = committedUnl.has(cleanString(prior.publicKey || '',256).toLowerCase());
+    if (stillCommitted) {
+      const h = health.get(prior.publicKey) || null;
+      const nextHealth = h && ['suspect','dead','unknown'].includes(h.status) ? h.status : (prior.health === 'dead' ? 'dead' : 'suspect');
+      const record = {
+        ...prior,
+        isUnl: true,
+        present: false,
+        health: nextHealth,
+        retiredAt: null,
+        retiredAtLcl: null
+      };
+      if (prior.present !== false || prior.isUnl !== true || prior.health !== nextHealth) {
+        record.lastUpdatedAt = now || prior.lastUpdatedAt || null;
+        record.lastUpdatedLcl = lcl || prior.lastUpdatedLcl || null;
+      }
+      records.push(record);
+      continue;
+    }
+
     const alreadyRetired = prior.present === false && prior.health === 'retired';
     records.push({
       ...prior,
@@ -9889,18 +10080,32 @@ async function tick(run) {
     return;
   }
 
-  // HANDOVER FENCE: all target managed validators are already committed in UNL
-  // beside Bootstrap A. No lifecycle work may disturb this temporary target+1
-  // bridge while the root control plane installs the final signer list and reward
-  // tracking. The next membership command removes Bootstrap A only.
+  // FIXED-SIZE HANDOVER FENCE: all final managed signer identities were already
+  // generated locally and authenticated while candidates were pre-UNL. No NPL
+  // 5/5 gather is required here, and no lifecycle work may disturb the frozen
+  // A + (target-1) bridge while the root control plane installs the final signer list.
   if (state.phase === 'signing') {
     const target = finalManagedTarget(state);
     const currentUnl = currentUnlPubkeys(run);
+    const bootstrap = cleanString(state.bootstrapPubkey || '',256).toLowerCase();
+    if (currentUnl.includes(bootstrap) && currentUnl.length === target + 1) {
+      const existing = normalizeMembershipCommand(state.membershipCommand);
+      if (!existing) {
+        const managedUnl = managedNodes(run, true);
+        const preferred = managedUnl.filter(n => !/^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(String(n.signerAddress || ''))).sort((a,b)=>String(a.pubkey).localeCompare(String(b.pubkey)))[0]
+          || managedUnl.slice().sort((a,b)=>String(b.pubkey).localeCompare(String(a.pubkey)))[0];
+        if (preferred) {
+          state.membershipCommand = { active:true, operation:'demote-managed', pubkey:preferred.pubkey, requestedAtLcl:Number(run.hpContext && run.hpContext.lclSeqNo)||null, submittedAtLcl:null, reason:'upgrade repair: collapse legacy target+1 bridge to fixed-size Bootstrap A + target-1 managed' };
+          saveState(state);
+          console.log(`AutoCluster: LEGACY TARGET+1 BRIDGE detected (${currentUnl.length}/${target}). Requested DEMOTE_MANAGED ${cleanString(preferred.pubkey,24)}${preferred.signerAddress?'':' (missing signer preferred)'} so the handover can resume at fixed size.`);
+        }
+      }
+      return;
+    }
     const frozen = normalizePubkeyList(state.handoverSignerPubkeys);
-    console.log(`AutoCluster: SIGNING FENCE active; frozen final managed signer set=${frozen.length}/${target}. Temporary UNL=${currentUnl.length}/${target + 1} (Bootstrap A + managed fleet). Waiting for root handover preparation.`);
+    console.log(`AutoCluster: FIXED-SIZE SIGNING FENCE active; frozen final managed signer set=${frozen.length}/${target}. Waiting for root handover preparation; UNL remains exactly ${target} validators.`);
     return;
   }
-
 
   // Persist the validator identity -> Evernode endpoint/acquisition mapping in
   // consensus state. Existing alpha.36 clusters are backfilled automatically
@@ -10011,16 +10216,18 @@ async function tick(run) {
     }
   }
 
-  // Handover readiness: all target managed validators join first, so bootstrap
-  // temporarily runs target+1 validators (A + the complete managed fleet).
-  // Once all managed signer identities are present, freeze that managed set and
-  // enter signer preparation. Final membership later removes A only.
+  // Fixed-size handover: stop UNL growth at A + target-1 managed validators, but
+  // acquire the complete final managed fleet up front. The last managed instance
+  // remains pre-UNL until the root has installed the final managed SignerList; then
+  // one atomic membership command swaps A out and that already-qualified instance in.
   if (state.phase === 'growing') {
     const handover = fixedSizeBootstrapHandoverSet(run);
-    if (handover.bridgeReady) {
-      if (!handover.ready) {
-        const signed = handover.unlManaged.filter(n => /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(String(n.signerAddress || ''))).length;
-        console.log(`AutoCluster: HANDOVER waiting for managed signer identities ${signed}/${handover.target}; temporary UNL already has Bootstrap A + all ${handover.bridgeManagedTarget} managed validators (${handover.currentUnl.length}/${handover.bridgeTarget}).`);
+    if (handover.unlManaged.length >= handover.bridgeManagedTarget && handover.currentUnl.length >= handover.target) {
+      if (handover.all.length < handover.target) {
+        console.log(`AutoCluster: FIXED-SIZE HANDOVER waiting for full upfront managed fleet ${handover.all.length}/${handover.target}; committed UNL stays ${handover.currentUnl.length}/${handover.target} including Bootstrap A.`);
+      } else if (!handover.ready) {
+        const signed = handover.all.filter(n => /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(String(n.signerAddress || ''))).length;
+        console.log(`AutoCluster: FIXED-SIZE HANDOVER waiting for final pre-UNL candidate: bridge=${handover.unlManaged.length}/${handover.bridgeManagedTarget}, signer-identities=${signed}/${handover.target}, eligible-final=${handover.eligible.length}. No target+1 UNL growth is permitted.`);
       } else {
         const keep = new Set(handover.pubkeys);
         const currentSet = new Set(handover.currentUnl);
@@ -10033,12 +10240,11 @@ async function tick(run) {
         state.handoverSignerPubkeys = handover.pubkeys;
         state.phase = 'signing';
         saveState(state);
-        console.log(`AutoCluster: HANDOVER READY at LCL ${run.hpContext.lclSeqNo || '?'}: temporary UNL=${handover.currentUnl.length}/${handover.bridgeTarget} (Bootstrap A + ${handover.bridgeManagedTarget} managed), signer identities=${handover.pubkeys.length}/${handover.target}. Entering signer preparation; final membership step removes Bootstrap A only.`);
+        console.log(`AutoCluster: FIXED-SIZE HANDOVER READY at LCL ${run.hpContext.lclSeqNo || '?'}: UNL=${handover.currentUnl.length}/${handover.target} (Bootstrap A + ${handover.bridgeManagedTarget} managed), final pre-acquired replacement=${cleanString(handover.replacement.pubkey,24)}, signer identities=${handover.pubkeys.length}/${handover.target}. Entering signer preparation without creating a ${handover.target + 1}-validator bridge.`);
         return;
       }
     }
   }
-
 
   const target = (state.phase === 'autonomous' || state.phase === 'handover')
     ? state.targetManagedNodes
@@ -10109,7 +10315,7 @@ async function end(run) {
   // This is node-local evidence only (outside consensus state). Every managed
   // non-bootstrap node signs its own LCL/hash/maturity/public-signer identity with
   // the HotPocket node key. This also repairs signer identity after upgrading from
-  // a target+1 bootstrap bridge. The root sidecar relays it only after execution.
+  // a legacy target+1 bridge. The root sidecar relays it only after execution.
   writeSignedCandidateAttestation(run);
   run.closed = true;
   if (run.clusterContext && typeof run.clusterContext.deinit === 'function') await run.clusterContext.deinit();
@@ -10190,3 +10396,123 @@ function publicStatus() {
 }
 
 module.exports = { isConfigured, loadState, prepareBootstrap, activateBootstrap, setBootstrapEndpoint, confirmMasterHandover, addHosts, removeHost, retryFailedHosts, retryFundingWait, skipPendingAttempt, dropCandidateInstance, setMaxLeaseAmount, armBootstrapMeshOverride, setRuntimeSettings, setRpcPools, retryRpcPool, addValidatorViaEverPocket, validatorStabilizationPreflight, begin, tick, end, feedUserMessage, publicStatus, recordRuntimeError };
+
+// -----------------------------------------------------------------------------
+// Runtime-version compatibility
+// -----------------------------------------------------------------------------
+// Docker builds bundle this full source (including EverPocket dependencies) into
+// state/cluster-controller.js. A runtime ZIP, however, is activated from
+// state/contract-versions/<id>/ where bare npm dependencies are intentionally not
+// available. When loaded from such a staged version, patch the already-bundled
+// root controller with the function bodies from THIS full source and execute the
+// patched bundle. This keeps one real 10k+ line source file for rebuilds while
+// making the same file safe for EverAdmin runtime ZIP activation.
+function __everAdminRuntimeReplaceRange(source, startMarker, endMarker, replacement, label) {
+  const start = source.indexOf(startMarker);
+  if (start < 0) throw new Error(`runtime patch marker not found (${label}: start)`);
+  const end = source.indexOf(endMarker, start + startMarker.length);
+  if (end < 0) throw new Error(`runtime patch marker not found (${label}: end)`);
+  return source.slice(0, start) + replacement.trimEnd() + '\n\n' + source.slice(end);
+}
+function __everAdminRuntimeExtractRange(source, startMarker, endMarker, label) {
+  const start = source.indexOf(startMarker);
+  if (start < 0) throw new Error(`runtime source marker not found (${label}: start)`);
+  const end = source.indexOf(endMarker, start + startMarker.length);
+  if (end < 0) throw new Error(`runtime source marker not found (${label}: end)`);
+  return source.slice(start, end).trimEnd();
+}
+function __everAdminLoadPatchedBundledController() {
+  const Module = require('module');
+  const stateRoot = process.cwd();
+  const baseController = path.resolve(stateRoot, 'cluster-controller.js');
+  const versionsRoot = path.resolve(stateRoot, 'contract-versions');
+  const here = path.resolve(__dirname);
+  if (!(here === versionsRoot || here.startsWith(versionsRoot + path.sep))) return null;
+  if (!fs.existsSync(baseController)) throw new Error(`built-in bundled controller is missing: ${baseController}`);
+
+  const selfSource = fs.readFileSync(__filename, 'utf8');
+  let bundled = fs.readFileSync(baseController, 'utf8');
+
+  const quiet = __everAdminRuntimeExtractRange(selfSource,
+    'function autonomousCanonicalWitnessRequired(state)',
+    'function normalizePromotionBatch(raw)',
+    'quiet-ledger');
+  const light = __everAdminRuntimeExtractRange(selfSource,
+    'function lightweightAutonomousMissingUnlPreflight(state, hpContext, committedUnl)',
+    'function refreshAutonomousMaintenanceHealth(run)',
+    'missing-unl-lightweight');
+  const health = __everAdminRuntimeExtractRange(selfSource,
+    'function refreshAutonomousMaintenanceHealth(run)',
+    'function beginAutonomousRepair(run, dead)',
+    'autonomous-health');
+  const advance = __everAdminRuntimeExtractRange(selfSource,
+    'async function advanceAutonomousRepair(run)',
+    'async function normalizeAutonomousSignerList(run)',
+    'advance-repair');
+  const validators = __everAdminRuntimeExtractRange(selfSource,
+    'function syncValidatorRecords(run)',
+    'function availableUnlSyncPeers(run)',
+    'validator-records');
+
+  if (bundled.includes('function autonomousCanonicalWitnessRequired(state)')) {
+    bundled = __everAdminRuntimeReplaceRange(bundled,
+      'function autonomousCanonicalWitnessRequired(state)',
+      'function normalizePromotionBatch(raw)', quiet, 'quiet-existing');
+  } else {
+    bundled = __everAdminRuntimeReplaceRange(bundled,
+      'function rememberCurrentLedger(state, hpContext, localIsUnl = true)',
+      'function normalizePromotionBatch(raw)', quiet, 'quiet-legacy');
+  }
+
+  // Install lightweight helper immediately before the heavy health function.
+  const healthMarker = 'function refreshAutonomousMaintenanceHealth(run)';
+  const healthPos = bundled.indexOf(healthMarker);
+  if (healthPos < 0) throw new Error('runtime patch marker not found (health insert)');
+  bundled = bundled.slice(0, healthPos) + light + '\n\n' + bundled.slice(healthPos);
+
+  bundled = __everAdminRuntimeReplaceRange(bundled,
+    'function refreshAutonomousMaintenanceHealth(run)',
+    'function beginAutonomousRepair(run, dead)', health, 'health');
+  bundled = __everAdminRuntimeReplaceRange(bundled,
+    'async function advanceAutonomousRepair(run)',
+    'async function normalizeAutonomousSignerList(run)', advance, 'advance');
+  bundled = __everAdminRuntimeReplaceRange(bundled,
+    'function syncValidatorRecords(run)',
+    'function availableUnlSyncPeers(run)', validators, 'validators');
+
+  const committedMarker = '  hpContext.__everSmartNodeCommittedUnl = committedUnl;';
+  const preflightCall = '  lightweightAutonomousMissingUnlPreflight(state, hpContext, committedUnl);';
+  if (!bundled.includes(preflightCall)) {
+    const idx = bundled.indexOf(committedMarker);
+    if (idx < 0) throw new Error('runtime patch marker not found (committed UNL preflight)');
+    const insertAt = idx + committedMarker.length;
+    bundled = bundled.slice(0, insertAt) + '\n' + preflightCall + bundled.slice(insertAt);
+  }
+
+  const compiledFile = path.resolve(stateRoot, '.everadmin-autonomous-repair-controller.js');
+  const compiled = new Module(compiledFile, module.parent || module);
+  compiled.filename = compiledFile;
+  compiled.paths = Module._nodeModulePaths(stateRoot);
+  compiled._compile(bundled, compiledFile);
+  console.log('AutoCluster runtime patch: full-source controller patched and loaded the bundled base with autonomous quiet-state + missing committed-UNL repair logic.');
+  return compiled.exports;
+}
+
+try {
+  const __runtimeController = __everAdminLoadPatchedBundledController();
+  if (__runtimeController) module.exports = __runtimeController;
+} catch (__runtimePatchError) {
+  console.log(`AutoCluster runtime patch FAILED: ${__runtimePatchError && __runtimePatchError.stack ? __runtimePatchError.stack : __runtimePatchError}`);
+  // Operational fallback: keep AutoCluster available on the bundled image code
+  // rather than recreating the source-only MODULE_NOT_FOUND failure.
+  try {
+    const __fallback = path.resolve(process.cwd(), 'cluster-controller.js');
+    if (path.resolve(__filename) !== __fallback && fs.existsSync(__fallback)) {
+      delete require.cache[require.resolve(__fallback)];
+      module.exports = require(__fallback);
+      console.log('AutoCluster runtime patch: fell back to bundled base controller.');
+    }
+  } catch (__fallbackError) {
+    console.log(`AutoCluster runtime fallback FAILED: ${__fallbackError && __fallbackError.stack ? __fallbackError.stack : __fallbackError}`);
+  }
+}
